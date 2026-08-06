@@ -1,2 +1,2 @@
 # healthflow
-Its aa hospital management system for a database project. It organizes the information of patients and doctors and creates an easy method to  create appointment, book room and lab tests. We have tried to recreate the mini-version of an actual medium sized private hospital.
+This database project models a medium-sized private hospital, streamlining information management for patients and medical staff. It provides an efficient platform for scheduling appointments, managing room admissions, and ordering lab tests within a unified system.
