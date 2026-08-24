@@ -21,11 +21,14 @@ app.use((req, res, next) => {
 });
 
 // ---------- Routes ----------
-app.use('/api/patients',     require('./routes/patients')); 
-app.use('/api/departments', require('./routes/departments'));
+app.use('/api/patients',     require('./routes/patients'));
+app.use('/api/departments',  require('./routes/departments'));
 app.use('/api/doctors',      require('./routes/doctors'));
 app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/billing',      require('./routes/billing'));
+app.use('/api/admissions',   require('./routes/admissions'));
+app.use('/api/prescriptions', require('./routes/prescriptions'));
+app.use('/api/labtests', require('./routes/labtests'));
 
 // Health check — browser e localhost:5000 e gele eta dekhabe
 app.get('/', (req, res) => {
