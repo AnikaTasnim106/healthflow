@@ -1,12 +1,18 @@
-
+// ============================================================
+//  App.jsx — shell + navigation
+//  Notun page banale ekhane duita jayga te add korte hobe:
+//    1. import
+//    2. TABS array
+// ============================================================
 
 import { useState } from 'react';
 import Patients from './pages/Patients';
+import Doctors from './pages/Doctors';
 import './App.css';
 
 const TABS = [
   { id: 'patients', label: 'Patients', component: Patients },
-  // { id: 'doctors',      label: 'Doctors',      component: Doctors },
+  { id: 'doctors',  label: 'Doctors',  component: Doctors },
   // { id: 'appointments', label: 'Appointments', component: Appointments },
   // { id: 'billing',      label: 'Billing',      component: Billing },
 ];

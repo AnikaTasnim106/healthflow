@@ -21,7 +21,8 @@ app.use((req, res, next) => {
 });
 
 // ---------- Routes ----------
-app.use('/api/patients',     require('./routes/patients'));
+app.use('/api/patients',     require('./routes/patients')); 
+app.use('/api/departments', require('./routes/departments'));
 app.use('/api/doctors',      require('./routes/doctors'));
 app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/billing',      require('./routes/billing'));
