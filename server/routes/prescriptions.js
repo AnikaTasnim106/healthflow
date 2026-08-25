@@ -1,13 +1,7 @@
-// ============================================================
-//  routes/prescriptions.js
-//  Create (prescription + presc_medicine, TRANSACTION), get by patient
-// ============================================================
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET ek prescription — medicine list shoho
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -40,7 +34,7 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /patient/:patientId — ek patient er shob prescription history
+
 router.get('/patient/:patientId', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -57,8 +51,7 @@ router.get('/patient/:patientId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST — notun prescription (diagnosis + medicine list) — TRANSACTION
-// prescription + presc_medicine (jotogulo medicine ache) ekshathe insert hoy
+
 router.post('/', async (req, res, next) => {
   try {
     const { appt_id, diagnosis, medicines } = req.body;
@@ -90,7 +83,7 @@ router.post('/', async (req, res, next) => {
 
     res.status(201).json(prescription);
   } catch (err) {
-    // 23505 = ek appointment er jonno already prescription ache (appt_id UNIQUE)
+    
     if (err.code === '23505') {
       return res.status(409).json({
         error: 'Ei appointment er jonno already ekta prescription ache'

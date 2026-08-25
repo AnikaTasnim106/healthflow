@@ -1,13 +1,8 @@
-// ============================================================
-//  routes/labtests.js
-//  Assign, result add, pending list
-// ============================================================
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET all lab test types (catalog — test_name, cost)
+
 router.get('/catalog', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -17,7 +12,7 @@ router.get('/catalog', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /pending — jei test gulor result ekhono add hoyni
+
 router.get('/pending', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -35,7 +30,7 @@ router.get('/pending', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /patient/:patientId — ek patient er shob lab test history
+
 router.get('/patient/:patientId', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -52,7 +47,7 @@ router.get('/patient/:patientId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST — notun test assign kora (doctor kono test suggest korle)
+
 router.post('/', async (req, res, next) => {
   try {
     const { patient_id, test_id, doctor_id, test_date } = req.body;
@@ -79,8 +74,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// PATCH — result add kora (patient_id + test_id + test_date diye identify kora hoy,
-// karon eta composite primary key)
+
 router.patch('/:patientId/:testId/:testDate', async (req, res, next) => {
   try {
     const { patientId, testId, testDate } = req.params;
