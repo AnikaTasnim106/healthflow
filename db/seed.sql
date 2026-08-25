@@ -1,9 +1,4 @@
--- ============================================================
--- HealthFlow — Sample Data
--- Run AFTER schema.sql
--- ============================================================
 
--- ---------- DEPARTMENT ----------
 INSERT INTO department (dept_name, location) VALUES
 ('Cardiology',      'Block A, 3rd Floor'),
 ('Neurology',       'Block A, 4th Floor'),
@@ -13,7 +8,6 @@ INSERT INTO department (dept_name, location) VALUES
 ('General Medicine','Block A, 1st Floor'),
 ('Dermatology',     'Block B, 3rd Floor');
 
--- ---------- DOCTOR ----------
 INSERT INTO doctor (name, specialization, phone, consult_fee, dept_id) VALUES
 ('Dr. Rezaul Karim',      'Interventional Cardiology', '01711000001', 1200.00, 1),
 ('Dr. Nasrin Sultana',    'Echocardiography',          '01711000002', 1000.00, 1),
@@ -26,7 +20,6 @@ INSERT INTO doctor (name, specialization, phone, consult_fee, dept_id) VALUES
 ('Dr. Kamrul Hasan',      'Diabetes & Hypertension',   '01711000009',  800.00, 6),
 ('Dr. Sabrina Chowdhury', 'Cosmetic Dermatology',      '01711000010',  950.00, 7);
 
--- ---------- PATIENT ----------
 INSERT INTO patient (name, dob, gender, phone, address, blood_group) VALUES
 ('Rahim Uddin',      '1985-03-12','M','01811000001','Mirpur-10, Dhaka',        'B+'),
 ('Fatema Khatun',    '1992-07-25','F','01811000002','Dhanmondi-27, Dhaka',     'O+'),
@@ -41,7 +34,6 @@ INSERT INTO patient (name, dob, gender, phone, address, blood_group) VALUES
 ('Sohel Rana',       '1999-04-05','M','01811000011','Mugda, Dhaka',            'A+'),
 ('Mim Akter',        '2018-10-27','F','01811000012','Rampura, Dhaka',          'O+');
 
--- ---------- ROOM ----------
 INSERT INTO room (room_no, room_type, daily_charge, status) VALUES
 ('A-101','General',      1500.00,'Available'),
 ('A-102','General',      1500.00,'Available'),
@@ -54,7 +46,6 @@ INSERT INTO room (room_no, room_type, daily_charge, status) VALUES
 ('I-402','ICU',         12000.00,'Available'),
 ('K-501','CCU',         15000.00,'Maintenance');
 
--- ---------- MEDICINE ----------
 INSERT INTO medicine (name, unit_price, stock_qty) VALUES
 ('Napa 500mg',          1.50, 5000),
 ('Seclo 20mg',          6.00, 3200),
@@ -69,7 +60,6 @@ INSERT INTO medicine (name, unit_price, stock_qty) VALUES
 ('Insulin 30/70',     420.00,  300),
 ('Omeprazole 40mg',     9.50, 1100);
 
--- ---------- LAB_TEST ----------
 INSERT INTO lab_test (test_name, cost) VALUES
 ('Complete Blood Count (CBC)',   500.00),
 ('Fasting Blood Sugar',          300.00),
@@ -82,7 +72,6 @@ INSERT INTO lab_test (test_name, cost) VALUES
 ('Urine R/E',                    400.00),
 ('Thyroid Function Test (TSH)', 1200.00);
 
--- ---------- DOCTOR_SCHEDULE ----------
 INSERT INTO doctor_schedule
  (doctor_id, day_of_week, start_time, end_time, chamber_no, slot_duration, max_patients, is_active) VALUES
 (1,'Saturday' ,'17:00','21:00','A-301',20,12,TRUE),
@@ -102,7 +91,6 @@ INSERT INTO doctor_schedule
 (9,'Monday'   ,'10:00','14:00','A-102',15,16,TRUE),
 (10,'Thursday','17:00','20:00','B-301',20, 9,FALSE);
 
--- ---------- APPOINTMENT ----------
 INSERT INTO appointment (patient_id, doctor_id, schedule_id, appt_date, time_slot, status) VALUES
 ( 1, 1, 1,'2026-07-04','17:20','Completed'),
 ( 2, 9,14,'2026-07-04','10:15','Completed'),
@@ -120,7 +108,6 @@ INSERT INTO appointment (patient_id, doctor_id, schedule_id, appt_date, time_slo
 ( 5, 1, 3,'2026-08-05','17:20','Scheduled'),
 ( 7, 3, 7,'2026-08-06','18:00','Scheduled');
 
--- ---------- PRESCRIPTION ----------
 INSERT INTO prescription (appt_id, presc_date, diagnosis) VALUES
 ( 1,'2026-07-04','Hypertension with mild LV hypertrophy'),
 ( 2,'2026-07-04','Type-2 Diabetes Mellitus, uncontrolled'),
@@ -133,7 +120,6 @@ INSERT INTO prescription (appt_id, presc_date, diagnosis) VALUES
 (11,'2026-07-13','Lumbar disc prolapse L4-L5'),
 (12,'2026-07-14','Iron deficiency anemia');
 
--- ---------- PRESC_MEDICINE  (M:N with relationship attributes) ----------
 INSERT INTO presc_medicine (presc_id, med_id, dosage, frequency, duration) VALUES
 ( 1, 4,'5mg'  ,'1+0+0','30 days'),
 ( 1, 8,'50mg' ,'0+0+1','30 days'),
@@ -155,7 +141,6 @@ INSERT INTO presc_medicine (presc_id, med_id, dosage, frequency, duration) VALUE
 ( 9,12,'40mg' ,'1+0+0','21 days'),
 (10, 1,'500mg','1+0+1','7 days');
 
--- ---------- PATIENT_TEST  (M:N, doctor_id = who suggested) ----------
 INSERT INTO patient_test (patient_id, test_id, test_date, result, doctor_id) VALUES
 ( 1, 5,'2026-07-04','Sinus rhythm, LVH pattern',              1),
 ( 1, 3,'2026-07-04','Total cholesterol 245 mg/dL — elevated', 1),
@@ -173,7 +158,6 @@ INSERT INTO patient_test (patient_id, test_id, test_date, result, doctor_id) VAL
 (12,10,'2026-07-14','TSH 3.1 mIU/L — normal',                 7),
 ( 1, 5,'2026-08-01','Sinus rhythm, improved',                 1);
 
--- ---------- ADMISSION ----------
 INSERT INTO admission (patient_id, room_no, admit_date, discharge_date) VALUES
 ( 3,'C-301','2026-07-06','2026-07-10'),
 ( 5,'A-101','2026-07-11','2026-07-15'),
@@ -186,7 +170,6 @@ INSERT INTO admission (patient_id, room_no, admit_date, discharge_date) VALUES
 
 UPDATE room SET status='Occupied' WHERE room_no IN ('C-302','A-103');
 
--- ---------- BILL ----------
 INSERT INTO bill (patient_id, admission_id, issue_date, total_amount, pay_status) VALUES
 ( 3, 1,'2026-07-10',  0,'Unpaid'),
 ( 5, 2,'2026-07-15',  0,'Unpaid'),
@@ -194,10 +177,9 @@ INSERT INTO bill (patient_id, admission_id, issue_date, total_amount, pay_status
 (11, 4,'2026-07-18',  0,'Unpaid'),
 ( 9, 5,'2026-07-13',  0,'Unpaid'),
 ( 7, 6,'2026-07-27',  0,'Unpaid'),
-( 2, NULL,'2026-07-04', 0,'Unpaid'),   -- OPD-only bill
-(12, NULL,'2026-07-14', 0,'Unpaid');   -- OPD-only bill
+( 2, NULL,'2026-07-04', 0,'Unpaid'),   
+(12, NULL,'2026-07-14', 0,'Unpaid');   
 
--- ---------- BILL_ITEM (weak entity) ----------
 INSERT INTO bill_item (bill_id, item_no, description, amount) VALUES
 (1,1,'Room charge — Private x 4 days', 22000.00),
 (1,2,'Doctor visit — Dr. Rezaul Karim', 1200.00),
@@ -233,24 +215,20 @@ INSERT INTO bill_item (bill_id, item_no, description, amount) VALUES
 (8,2,'Complete Blood Count (CBC)',         500.00),
 (8,3,'Thyroid Function Test (TSH)',       1200.00);
 
--- Recompute total_amount from the weak entity (derived attribute)
 UPDATE bill b
 SET total_amount = COALESCE(
     (SELECT SUM(bi.amount) FROM bill_item bi WHERE bi.bill_id = b.bill_id), 0);
 
--- ---------- PAYMENT ----------
 INSERT INTO payment (bill_id, pay_date, method, paid_amount) VALUES
-(1,'2026-07-10','Card',  27500.00),   -- full
-(2,'2026-07-15','bKash', 10000.00),   -- partial
-(2,'2026-07-20','Cash',   6500.00),   -- partial
-(3,'2026-07-16','Bank',  13900.00),   -- full
-(4,'2026-07-18','Nagad',  8000.00),   -- partial
-(5,'2026-07-13','Cash',   4200.00),   -- full
-(6,'2026-07-27','Card',  50000.00),   -- partial
-(7,'2026-07-04','bKash',  1600.00);   -- full
--- bill 8 has no payment → stays Unpaid
+(1,'2026-07-10','Card',  27500.00),  
+(2,'2026-07-15','bKash', 10000.00),   
+(2,'2026-07-20','Cash',   6500.00),   
+(3,'2026-07-16','Bank',  13900.00),  
+(4,'2026-07-18','Nagad',  8000.00),   
+(5,'2026-07-13','Cash',   4200.00),   
+(6,'2026-07-27','Card',  50000.00),   
+(7,'2026-07-04','bKash',  1600.00);   
 
--- Recompute pay_status (derived)
 UPDATE bill b
 SET pay_status = CASE
     WHEN COALESCE((SELECT SUM(p.paid_amount) FROM payment p

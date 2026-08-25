@@ -1,13 +1,8 @@
-// ============================================================
-//  routes/doctors.js
-//  TODO — patients.js er pattern follow koro
-// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET all doctors (department naam shoho)
 router.get('/', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -21,7 +16,6 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET ek doctor er weekly schedule
 router.get('/:id/schedule', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -36,12 +30,7 @@ router.get('/:id/schedule', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// TODO: GET /:id  — ek doctor er details
-// TODO: POST /    — notun doctor add
-// TODO: PUT /:id  — update
-// TODO: DELETE /:id
 
-// GET ek doctor er details
 router.get('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -60,7 +49,6 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST notun doctor add
 router.post('/', async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
@@ -74,7 +62,6 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// PUT doctor update
 router.put('/:id', async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
@@ -92,7 +79,6 @@ router.put('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// DELETE doctor
 router.delete('/:id', async (req, res, next) => {
   try {
     const result = await db.query(

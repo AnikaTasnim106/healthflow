@@ -1,8 +1,3 @@
--- ============================================================
--- HealthFlow — Hospital Management System
--- PostgreSQL Schema (DDL)
--- Mapped from approved ERD : 13 entities + 2 M:N = 15 tables
--- ============================================================
 
 DROP TABLE IF EXISTS payment CASCADE;
 DROP TABLE IF EXISTS bill_item CASCADE;
@@ -21,9 +16,6 @@ DROP TABLE IF EXISTS doctor CASCADE;
 DROP TABLE IF EXISTS department CASCADE;
 
 
--- ============================================================
--- 1. INDEPENDENT / STRONG ENTITIES
--- ============================================================
 
 CREATE TABLE department (
     dept_id     SERIAL PRIMARY KEY,
@@ -82,10 +74,6 @@ CREATE TABLE lab_test (
 );
 
 
--- ============================================================
--- 2. DOCTOR_SCHEDULE   (Doctor 1:N Schedule — "sets")
---    Separated out to avoid a multivalued attribute on doctor
--- ============================================================
 
 CREATE TABLE doctor_schedule (
     schedule_id    SERIAL PRIMARY KEY,
@@ -108,11 +96,6 @@ CREATE TABLE doctor_schedule (
 );
 
 
--- ============================================================
--- 3. APPOINTMENT   (hub entity)
---    books (Patient 1:N) | attends (Doctor 1:N) | contains (Schedule 1:N)
--- ============================================================
-
 CREATE TABLE appointment (
     appt_id      SERIAL PRIMARY KEY,
     patient_id   INT NOT NULL
@@ -129,14 +112,10 @@ CREATE TABLE appointment (
     status       VARCHAR(12) NOT NULL DEFAULT 'Scheduled'
                  CHECK (status IN ('Scheduled','Completed','Cancelled','No-Show')),
 
-    -- one doctor cannot be double-booked in the same slot
     CONSTRAINT uq_doc_slot UNIQUE (doctor_id, appt_date, time_slot)
 );
 
 
--- ============================================================
--- 4. PRESCRIPTION  (Appointment 1:1 → "results_in")
--- ============================================================
 
 CREATE TABLE prescription (
     presc_id    SERIAL PRIMARY KEY,
@@ -147,12 +126,6 @@ CREATE TABLE prescription (
     diagnosis   VARCHAR(255)
 );
 
-
--- ============================================================
--- 5. PRESC_MEDICINE   M:N "includes"
---    Dosage / Duration / Frequency are RELATIONSHIP attributes
--- ============================================================
-
 CREATE TABLE presc_medicine (
     presc_id   INT NOT NULL
                REFERENCES prescription(presc_id)
@@ -160,18 +133,14 @@ CREATE TABLE presc_medicine (
     med_id     INT NOT NULL
                REFERENCES medicine(med_id)
                ON UPDATE CASCADE ON DELETE RESTRICT,
-    dosage     VARCHAR(40) NOT NULL,        -- e.g. '500mg'
-    frequency  VARCHAR(40) NOT NULL,        -- e.g. '1+0+1'
-    duration   VARCHAR(40) NOT NULL,        -- e.g. '7 days'
+    dosage     VARCHAR(40) NOT NULL,       
+    frequency  VARCHAR(40) NOT NULL,       
+    duration   VARCHAR(40) NOT NULL,       
 
     PRIMARY KEY (presc_id, med_id)
 );
 
 
--- ============================================================
--- 6. PATIENT_TEST   M:N "undergoes"  (+ "suggested" merged in)
---    test_date is part of PK: same test can repeat on another day
--- ============================================================
 
 CREATE TABLE patient_test (
     patient_id  INT NOT NULL
@@ -190,9 +159,6 @@ CREATE TABLE patient_test (
 );
 
 
--- ============================================================
--- 7. ADMISSION   (Patient 1:N "admitted" | Room N:1 "occupies")
--- ============================================================
 
 CREATE TABLE admission (
     admission_id    SERIAL PRIMARY KEY,
@@ -209,15 +175,10 @@ CREATE TABLE admission (
                                     OR discharge_date >= admit_date)
 );
 
--- A room can hold only ONE active (not-yet-discharged) admission
 CREATE UNIQUE INDEX uq_room_active
     ON admission(room_no)
     WHERE discharge_date IS NULL;
 
-
--- ============================================================
--- 8. BILL   (Admission "generates" | Patient "receives")
--- ============================================================
 
 CREATE TABLE bill (
     bill_id       SERIAL PRIMARY KEY,
@@ -235,12 +196,6 @@ CREATE TABLE bill (
 );
 
 
--- ============================================================
--- 9. BILL_ITEM  ***WEAK ENTITY***
---    item_no = partial key | full PK = (bill_id, item_no)
---    Existence dependent → ON DELETE CASCADE
--- ============================================================
-
 CREATE TABLE bill_item (
     bill_id      INT NOT NULL
                  REFERENCES bill(bill_id)
@@ -253,10 +208,6 @@ CREATE TABLE bill_item (
 );
 
 
--- ============================================================
--- 10. PAYMENT   (Bill 1:N "Paid_By" — supports installments)
--- ============================================================
-
 CREATE TABLE payment (
     payment_id   SERIAL PRIMARY KEY,
     bill_id      INT NOT NULL
@@ -268,10 +219,6 @@ CREATE TABLE payment (
     paid_amount  NUMERIC(10,2) NOT NULL CHECK (paid_amount > 0)
 );
 
-
--- ============================================================
--- INDEXES for common lookups
--- ============================================================
 CREATE INDEX idx_appt_date     ON appointment(appt_date);
 CREATE INDEX idx_appt_patient  ON appointment(patient_id);
 CREATE INDEX idx_doctor_dept   ON doctor(dept_id);

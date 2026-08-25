@@ -1,21 +1,9 @@
-// ============================================================
-//  routes/patients.js
-//  ⭐ EI FILE TA REFERENCE — baki route gulo ei pattern e likhba
-//
-//  Endpoints:
-//    GET    /api/patients        → sob patient
-//    GET    /api/patients/:id    → ek patient + tar appointment history
-//    POST   /api/patients        → notun patient
-//    PUT    /api/patients/:id    → update
-//    DELETE /api/patients/:id    → delete
-// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
 
-// ---------- GET all (search + pagination shoho) ----------
 router.get('/', async (req, res, next) => {
   try {
     const { search = '', limit = 50, offset = 0 } = req.query;
@@ -34,9 +22,6 @@ router.get('/', async (req, res, next) => {
     next(err);
   }
 });
-
-
-// ---------- GET one (+ appointment history) ----------
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -49,7 +34,6 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Ei patient er appointment gulo, doctor er naam shoho
     const appointments = await db.query(
       `SELECT a.appt_id, a.appt_date, a.time_slot, a.status,
               d.name AS doctor_name, dep.dept_name
@@ -71,7 +55,6 @@ router.get('/:id', async (req, res, next) => {
 });
 
 
-// ---------- POST create ----------
 router.post('/', async (req, res, next) => {
   try {
     const { name, dob, gender, phone, address, blood_group } = req.body;
@@ -89,7 +72,6 @@ router.post('/', async (req, res, next) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    // 23514 = CHECK constraint violation (jemon bhul blood group)
     if (err.code === '23514') {
       return res.status(400).json({ error: 'Invalid value — check gender or blood group' });
     }
@@ -98,7 +80,6 @@ router.post('/', async (req, res, next) => {
 });
 
 
-// ---------- PUT update ----------
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -124,7 +105,6 @@ router.put('/:id', async (req, res, next) => {
 });
 
 
-// ---------- DELETE ----------
 router.delete('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -138,7 +118,6 @@ router.delete('/:id', async (req, res, next) => {
 
     res.json({ message: 'Patient deleted', patient_id: result.rows[0].patient_id });
   } catch (err) {
-    // 23503 = FK violation — bill ase, tai delete kora jabe na
     if (err.code === '23503') {
       return res.status(409).json({
         error: 'Cannot delete — this patient has bills or admissions linked'
