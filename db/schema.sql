@@ -1,4 +1,3 @@
-
 DROP TABLE IF EXISTS payment CASCADE;
 DROP TABLE IF EXISTS bill_item CASCADE;
 DROP TABLE IF EXISTS bill CASCADE;
@@ -74,7 +73,6 @@ CREATE TABLE lab_test (
 );
 
 
-
 CREATE TABLE doctor_schedule (
     schedule_id    SERIAL PRIMARY KEY,
     doctor_id      INT NOT NULL
@@ -119,12 +117,14 @@ CREATE TABLE appointment (
 
 CREATE TABLE prescription (
     presc_id    SERIAL PRIMARY KEY,
-    appt_id     INT NOT NULL UNIQUE          -- UNIQUE enforces 1:1
+    appt_id     INT NOT NULL UNIQUE          
                 REFERENCES appointment(appt_id)
                 ON UPDATE CASCADE ON DELETE CASCADE,
     presc_date  DATE NOT NULL DEFAULT CURRENT_DATE,
     diagnosis   VARCHAR(255)
 );
+
+
 
 CREATE TABLE presc_medicine (
     presc_id   INT NOT NULL
@@ -133,9 +133,9 @@ CREATE TABLE presc_medicine (
     med_id     INT NOT NULL
                REFERENCES medicine(med_id)
                ON UPDATE CASCADE ON DELETE RESTRICT,
-    dosage     VARCHAR(40) NOT NULL,       
-    frequency  VARCHAR(40) NOT NULL,       
-    duration   VARCHAR(40) NOT NULL,       
+    dosage     VARCHAR(40) NOT NULL,        
+    frequency  VARCHAR(40) NOT NULL,     
+    duration   VARCHAR(40) NOT NULL,      
 
     PRIMARY KEY (presc_id, med_id)
 );
@@ -151,13 +151,12 @@ CREATE TABLE patient_test (
                 ON UPDATE CASCADE ON DELETE RESTRICT,
     test_date   DATE NOT NULL DEFAULT CURRENT_DATE,
     result      TEXT,
-    doctor_id   INT                          -- who suggested the test
+    doctor_id   INT                    
                 REFERENCES doctor(doctor_id)
                 ON UPDATE CASCADE ON DELETE SET NULL,
 
     PRIMARY KEY (patient_id, test_id, test_date)
 );
-
 
 
 CREATE TABLE admission (
@@ -185,7 +184,7 @@ CREATE TABLE bill (
     patient_id    INT NOT NULL
                   REFERENCES patient(patient_id)
                   ON UPDATE CASCADE ON DELETE RESTRICT,
-    admission_id  INT                        -- NULL for OPD-only bills
+    admission_id  INT                       
                   REFERENCES admission(admission_id)
                   ON UPDATE CASCADE ON DELETE SET NULL,
     issue_date    DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -194,6 +193,7 @@ CREATE TABLE bill (
     pay_status    VARCHAR(10) NOT NULL DEFAULT 'Unpaid'
                   CHECK (pay_status IN ('Unpaid','Partial','Paid'))
 );
+
 
 
 CREATE TABLE bill_item (
@@ -206,6 +206,7 @@ CREATE TABLE bill_item (
 
     PRIMARY KEY (bill_id, item_no)
 );
+
 
 
 CREATE TABLE payment (

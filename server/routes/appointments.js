@@ -1,6 +1,5 @@
 // ============================================================
 //  routes/appointments.js
-//  TODO — patients.js er pattern follow koro
 // ============================================================
 
 const express = require('express');
@@ -29,33 +28,30 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST — notun appointment book
-router.post('/', async (req, res, next) => {
+// GET available slots — ekta doctor er ekta din kon kon slot faka
+// ⚠️ Eta /:id er AGE thakte hobe, nahole Express "available-slots" ke id mone korbe
+router.get('/available-slots', async (req, res, next) => {
   try {
-    const { patient_id, doctor_id, schedule_id, appt_date, time_slot } = req.body;
+    const { doctor_id, date } = req.query;
 
-    const result = await db.query(
-      `INSERT INTO appointment
-         (patient_id, doctor_id, schedule_id, appt_date, time_slot)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [patient_id, doctor_id, schedule_id, appt_date, time_slot]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    // 23505 = UNIQUE violation → uq_doc_slot fire korlo
-    if (err.code === '23505') {
-      return res.status(409).json({
-        error: 'Ei doctor er oi slot ta already booked'
-      });
+    if (!doctor_id || !date) {
+      return res.status(400).json({ error: 'doctor_id and date required' });
     }
-    next(err);
-  }
-});
 
-// TODO: GET /:id                    — ek appointment + prescription
-// TODO: PATCH /:id/status           — Completed / Cancelled mark kora
-// TODO: GET /available-slots        — kon slot faka ache
+    // ei doctor er oi date e already booked slot gulo
+    const booked = await db.query(
+      `SELECT time_slot FROM appointment
+       WHERE doctor_id = $1 AND appt_date = $2 AND status != 'Cancelled'`,
+      [doctor_id, date]
+    );
+
+    res.json({
+      doctor_id,
+      date,
+      booked_slots: booked.rows.map(r => r.time_slot)
+    });
+  } catch (err) { next(err); }
+});
 
 // GET ek appointment + tar prescription (jodi thake)
 router.get('/:id', async (req, res, next) => {
@@ -85,6 +81,30 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST — notun appointment book
+router.post('/', async (req, res, next) => {
+  try {
+    const { patient_id, doctor_id, schedule_id, appt_date, time_slot } = req.body;
+
+    const result = await db.query(
+      `INSERT INTO appointment
+         (patient_id, doctor_id, schedule_id, appt_date, time_slot)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [patient_id, doctor_id, schedule_id, appt_date, time_slot]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    // 23505 = UNIQUE violation → uq_doc_slot fire korlo
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: 'Ei doctor er oi slot ta already booked'
+      });
+    }
+    next(err);
+  }
+});
+
 // PATCH — status change kora (Completed / Cancelled / No-Show)
 router.patch('/:id/status', async (req, res, next) => {
   try {
@@ -105,30 +125,6 @@ router.patch('/:id/status', async (req, res, next) => {
     }
     next(err);
   }
-});
-
-// GET available slots — ekta doctor er ekta din kon kon slot faka
-router.get('/available-slots', async (req, res, next) => {
-  try {
-    const { doctor_id, date } = req.query;
-
-    if (!doctor_id || !date) {
-      return res.status(400).json({ error: 'doctor_id and date required' });
-    }
-
-    // ei doctor er oi date e already booked slot gulo
-    const booked = await db.query(
-      `SELECT time_slot FROM appointment
-       WHERE doctor_id = $1 AND appt_date = $2 AND status != 'Cancelled'`,
-      [doctor_id, date]
-    );
-
-    res.json({
-      doctor_id,
-      date,
-      booked_slots: booked.rows.map(r => r.time_slot)
-    });
-  } catch (err) { next(err); }
 });
 
 module.exports = router;
