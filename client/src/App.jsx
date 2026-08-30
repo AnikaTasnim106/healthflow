@@ -10,12 +10,14 @@ import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
 import Appointments from './pages/Appointments';
 import Billing from './pages/Billing';
+import Admissions from './pages/Admissions';
 import './App.css';
 
 const NAV = [
   { id: 'patients', label: 'Patients', component: Patients },
   { id: 'doctors',  label: 'Doctors',  component: Doctors },
   { id: 'appointments', label: 'Appointments', component: Appointments },
+  { id: 'admissions',   label: 'Admissions',   component: Admissions },
   { id: 'billing',      label: 'Billing',      component: Billing },
 ];
 

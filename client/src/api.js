@@ -40,4 +40,11 @@ export const getDueBills = ()        => api.get('/billing/due');
 export const createBill = (data)     => api.post('/billing', data);
 export const addPayment = (id, data) => api.post(`/billing/${id}/payment`, data);
 
+// ---------- ADMISSIONS ----------
+export const getAdmissions    = ()         => api.get('/admissions');
+export const getAdmission     = (id)       => api.get(`/admissions/${id}`);
+export const getAvailableRooms = ()        => api.get('/admissions/available-rooms');
+export const admitPatient     = (data)     => api.post('/admissions', data);
+export const dischargePatient = (id, data) => api.patch(`/admissions/${id}/discharge`, data);
+
 export default api;
