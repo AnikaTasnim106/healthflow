@@ -23,7 +23,7 @@ app.use('/api/billing',      require('./routes/billing'));
 app.use('/api/admissions',   require('./routes/admissions'));
 app.use('/api/prescriptions', require('./routes/prescriptions'));
 app.use('/api/labtests', require('./routes/labtests'));
-
+app.use('/api/medicines', require('./routes/medicines'));
 app.get('/', (req, res) => {
   res.json({ message: 'HealthFlow API is running 🏥' });
 });
