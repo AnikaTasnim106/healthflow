@@ -11,6 +11,8 @@ import Doctors from './pages/Doctors';
 import Appointments from './pages/Appointments';
 import Billing from './pages/Billing';
 import Admissions from './pages/Admissions';
+import LabTests from './pages/LabTests';
+import Prescriptions from './pages/Prescriptions';
 import './App.css';
 
 const NAV = [
@@ -18,6 +20,8 @@ const NAV = [
   { id: 'doctors',  label: 'Doctors',  component: Doctors },
   { id: 'appointments', label: 'Appointments', component: Appointments },
   { id: 'admissions',   label: 'Admissions',   component: Admissions },
+  { id: 'prescriptions', label: 'Prescriptions', component: Prescriptions },
+  { id: 'labtests',     label: 'Lab Tests',    component: LabTests },
   { id: 'billing',      label: 'Billing',      component: Billing },
 ];
 

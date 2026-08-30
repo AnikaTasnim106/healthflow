@@ -399,3 +399,24 @@ body{
 .pay-form select:focus, .pay-form input:focus{
   outline:2px solid var(--spine); outline-offset:-1px;
 }
+
+/* medicine line rows in the prescription form */
+.med-row{
+  display:grid;
+  grid-template-columns:26px minmax(150px,1.6fr) 1fr 1fr 1fr auto;
+  gap:8px; align-items:center;
+  margin-bottom:8px;
+}
+.med-row input, .med-row select{
+  padding:7px 9px;
+  border:1px solid var(--rule); border-radius:var(--r);
+  font-family:var(--sans); font-size:13px; color:var(--ink);
+  background:#fff; min-width:0;
+}
+.med-row input:focus, .med-row select:focus{
+  outline:2px solid var(--spine); outline-offset:-1px;
+}
+@media (max-width:860px){
+  .med-row{ grid-template-columns:1fr; }
+  .med-row .item-no{ text-align:left; }
+}

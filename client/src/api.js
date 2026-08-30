@@ -47,4 +47,21 @@ export const getAvailableRooms = ()        => api.get('/admissions/available-roo
 export const admitPatient     = (data)     => api.post('/admissions', data);
 export const dischargePatient = (id, data) => api.patch(`/admissions/${id}/discharge`, data);
 
+// ---------- LAB TESTS ----------
+export const getTestCatalog   = ()   => api.get('/labtests/catalog');
+export const getPendingTests  = ()   => api.get('/labtests/pending');
+export const getPatientTests  = (id) => api.get(`/labtests/patient/${id}`);
+export const assignTest       = (data) => api.post('/labtests', data);
+export const addTestResult    = (patientId, testId, testDate, result) =>
+  api.patch(`/labtests/${patientId}/${testId}/${testDate}`, { result });
+
+// ---------- MEDICINES ----------
+export const getMedicines = () => api.get('/medicines');
+export const getLowStock  = () => api.get('/medicines/low-stock');
+
+// ---------- PRESCRIPTIONS ----------
+export const getPrescription        = (id) => api.get(`/prescriptions/${id}`);
+export const getPatientPrescriptions = (id) => api.get(`/prescriptions/patient/${id}`);
+export const createPrescription     = (data) => api.post('/prescriptions', data);
+
 export default api;
