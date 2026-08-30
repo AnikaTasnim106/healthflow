@@ -1,8 +1,8 @@
 // ============================================================
 //  App.jsx — shell + navigation
-//  Notun page banale ekhane duita jayga te add korte hobe:
+//  Notun page banale duita jayga te add korte hobe:
 //    1. import
-//    2. TABS array
+//    2. NAV array
 // ============================================================
 
 import { useState } from 'react';
@@ -10,7 +10,7 @@ import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
 import './App.css';
 
-const TABS = [
+const NAV = [
   { id: 'patients', label: 'Patients', component: Patients },
   { id: 'doctors',  label: 'Doctors',  component: Doctors },
   // { id: 'appointments', label: 'Appointments', component: Appointments },
@@ -19,34 +19,29 @@ const TABS = [
 
 export default function App() {
   const [active, setActive] = useState('patients');
-
-  const Active = TABS.find(t => t.id === active).component;
+  const Active = NAV.find((n) => n.id === active).component;
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="mark">HF</span>
-          <div>
-            <h1>HealthFlow</h1>
-            <p>Hospital Management System</p>
-          </div>
+      <aside className="rail">
+        <div className="rail-brand">
+          <span className="mark">HealthFlow</span>
+          <span className="sub">Records</span>
         </div>
-      </header>
 
-      <nav className="tabs">
-        {TABS.map(t => (
+        <div className="rail-label">Registry</div>
+        {NAV.map((n) => (
           <button
-            key={t.id}
-            className={active === t.id ? 'tab active' : 'tab'}
-            onClick={() => setActive(t.id)}
+            key={n.id}
+            className={active === n.id ? 'rail-link on' : 'rail-link'}
+            onClick={() => setActive(n.id)}
           >
-            {t.label}
+            {n.label}
           </button>
         ))}
-      </nav>
+      </aside>
 
-      <main className="content">
+      <main className="page">
         <Active />
       </main>
     </div>

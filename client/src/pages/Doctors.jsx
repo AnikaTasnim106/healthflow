@@ -1,6 +1,13 @@
+// ============================================================
+//  Doctors.jsx
+//  Same pattern as Patients.jsx.
+//  The department dropdown needs GET /api/departments.
+// ============================================================
 
 import { useState, useEffect } from 'react';
 import { getDoctors, createDoctor, deleteDoctor, getDepartments } from '../api';
+
+const taka = (n) => `\u09F3${Number(n || 0).toLocaleString('en-IN')}`;
 
 export default function Doctors() {
   const [doctors, setDoctors] = useState([]);
@@ -9,10 +16,7 @@ export default function Doctors() {
   const [error, setError]     = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  const emptyForm = {
-    name: '', specialization: '', phone: '',
-    consult_fee: '', dept_id: ''
-  };
+  const emptyForm = { name: '', specialization: '', phone: '', consult_fee: '', dept_id: '' };
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -27,32 +31,27 @@ export default function Doctors() {
       const res = await getDoctors();
       setDoctors(res.data);
     } catch (err) {
-      setError('Could not load doctors. Is the server running?');
+      setError('Could not reach the server. Check that the backend is running on port 5000.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
+  // dept_id is a foreign key, so the options must come from the
+  // database. Hardcoding them would break on any FK mismatch.
   async function loadDepartments() {
     try {
       const res = await getDepartments();
       setDepts(res.data);
     } catch (err) {
-      // Endpoint may not exist yet — the list still works without it.
       console.warn('Departments endpoint not available yet');
     }
   }
 
   async function handleAdd() {
-    if (!form.name.trim()) {
-      setError('Name is required');
-      return;
-    }
-    if (!form.dept_id) {
-      setError('Please select a department');
-      return;
-    }
+    if (!form.name.trim())  { setError('Enter a name to add the doctor.'); return; }
+    if (!form.dept_id)      { setError('Choose a department.'); return; }
     try {
       await createDoctor({
         ...form,
@@ -63,136 +62,134 @@ export default function Doctors() {
       setShowForm(false);
       loadDoctors();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not add doctor');
+      setError(err.response?.data?.error || 'Could not add this doctor.');
     }
   }
 
   async function handleDelete(id, name) {
-    if (!window.confirm(`Delete ${name}?`)) return;
+    if (!window.confirm(`Remove ${name} from the directory?`)) return;
     try {
       await deleteDoctor(id);
       loadDoctors();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not delete doctor');
+      setError(err.response?.data?.error || 'Could not remove this doctor.');
     }
   }
+
   return (
     <div>
-      <div className="page-head">
+      <div className="page-top">
         <h2>Doctors</h2>
+        <span className="count">
+          {loading ? '\u2014' : `${doctors.length} on staff`}
+        </span>
+      </div>
+
+      <div className="toolbar">
+        <span style={{ flex: 1 }} />
         <button
-          className="btn"
+          className="btn primary"
           onClick={() => setShowForm(!showForm)}
           disabled={depts.length === 0}
           title={depts.length === 0 ? 'Departments endpoint not available yet' : ''}
         >
-          {showForm ? 'Cancel' : '+ New doctor'}
+          {showForm ? 'Close' : 'Add doctor'}
         </button>
       </div>
 
-      {error && <div className="error">{error}</div>}
-
-      {/* ---------- ADD FORM ---------- */}
-      {showForm && (
-        <div className="card form-grid">
-          <label>
-            Name
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Dr. Full Name"
-            />
-          </label>
-
-          <label>
-            Specialization
-            <input
-              value={form.specialization}
-              onChange={(e) => setForm({ ...form, specialization: e.target.value })}
-              placeholder="e.g. Interventional Cardiology"
-            />
-          </label>
-
-          <label>
-            Department
-            <select
-              value={form.dept_id}
-              onChange={(e) => setForm({ ...form, dept_id: e.target.value })}
-            >
-              <option value="">Select department</option>
-              {depts.map((d) => (
-                <option key={d.dept_id} value={d.dept_id}>
-                  {d.dept_name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Phone
-            <input
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="01711000000"
-            />
-          </label>
-
-          <label>
-            Consultation fee
-            <input
-              type="number"
-              min="0"
-              value={form.consult_fee}
-              onChange={(e) => setForm({ ...form, consult_fee: e.target.value })}
-              placeholder="1000"
-            />
-          </label>
-
-          <button className="btn primary" onClick={handleAdd}>
-            Save doctor
-          </button>
+      {error && (
+        <div className="alert">
+          <span>{error}</span>
+          <button className="x" onClick={() => setError('')}>Dismiss</button>
         </div>
       )}
 
-      {/* ---------- LIST ---------- */}
+      {showForm && (
+        <div className="form">
+          <div className="form-title">New doctor</div>
+          <div className="fields">
+            <label>
+              Full name
+              <input value={form.name} placeholder="Dr. Full Name"
+                onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </label>
+            <label>
+              Specialization
+              <input value={form.specialization} placeholder="Interventional Cardiology"
+                onChange={(e) => setForm({ ...form, specialization: e.target.value })} />
+            </label>
+            <label>
+              Department
+              <select value={form.dept_id}
+                onChange={(e) => setForm({ ...form, dept_id: e.target.value })}>
+                <option value="">Choose one</option>
+                {depts.map((d) => (
+                  <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Phone
+              <input value={form.phone} placeholder="01711000000"
+                onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </label>
+            <label>
+              Consultation fee
+              <input type="number" min="0" value={form.consult_fee} placeholder="1000"
+                onChange={(e) => setForm({ ...form, consult_fee: e.target.value })} />
+            </label>
+          </div>
+          <div className="form-actions">
+            <button className="btn" onClick={() => { setShowForm(false); setForm(emptyForm); }}>
+              Cancel
+            </button>
+            <button className="btn primary" onClick={handleAdd}>Save doctor</button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
-        <p className="muted">Loading...</p>
+        <div className="loading">Loading directory</div>
       ) : doctors.length === 0 ? (
-        <p className="muted">No doctors found.</p>
+        <div className="empty">
+          <p>No doctors on staff.</p>
+          <p className="hint">Add the first doctor to build the directory.</p>
+        </div>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Specialization</th>
-              <th>Department</th>
-              <th>Phone</th>
-              <th>Fee</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {doctors.map((d) => (
-              <tr key={d.doctor_id}>
-                <td>{d.doctor_id}</td>
-                <td><strong>{d.name}</strong></td>
-                <td>{d.specialization}</td>
-                <td>{d.dept_name}</td>
-                <td>{d.phone}</td>
-                <td>৳{Number(d.consult_fee).toLocaleString()}</td>
-                <td>
-                  <button
-                    className="btn danger sm"
-                    onClick={() => handleDelete(d.doctor_id, d.name)}
-                  >
-                    Delete
-                  </button>
-                </td>
+        <div className="records">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Doctor</th>
+                <th>Department</th>
+                <th>Phone</th>
+                <th className="right">Fee</th>
+                <th className="right">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {doctors.map((d) => (
+                <tr key={d.doctor_id}>
+                  <td><span className="id">D-{String(d.doctor_id).padStart(3, '0')}</span></td>
+                  <td>
+                    <div className="name">{d.name}</div>
+                    <div className="sub">{d.specialization || 'General practice'}</div>
+                  </td>
+                  <td><span className="stamp mute">{d.dept_name}</span></td>
+                  <td><span className="data">{d.phone || '\u2014'}</span></td>
+                  <td className="right"><span className="amount">{taka(d.consult_fee)}</span></td>
+                  <td className="right">
+                    <button className="btn ghost sm"
+                      onClick={() => handleDelete(d.doctor_id, d.name)}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
