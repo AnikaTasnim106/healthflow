@@ -1,9 +1,26 @@
+// ============================================================
+//  routes/patients.js
+//  Reference route — baki route gulo ei pattern e likhba.
+//
+//  Endpoints:
+//    GET    /api/patients        → sob patient (search + pagination)
+//    GET    /api/patients/:id    → ek patient + appointment history
+//    POST   /api/patients        → notun patient
+//    PUT    /api/patients/:id    → update
+//    DELETE /api/patients/:id    → delete
+// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+// Form theke khali field ashle '' (khali string) ashe.
+// Postgres er DATE column '' nite pare na — NULL lage.
+// Tai insert/update er age khali string ke NULL banie dei.
+const nz = (v) => (v === '' || v === undefined ? null : v);
 
+
+// ---------- GET all (search + pagination shoho) ----------
 router.get('/', async (req, res, next) => {
   try {
     const { search = '', limit = 50, offset = 0 } = req.query;
@@ -22,6 +39,9 @@ router.get('/', async (req, res, next) => {
     next(err);
   }
 });
+
+
+// ---------- GET one (+ appointment history) ----------
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -34,11 +54,12 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
+    // Ei patient er appointment gulo, doctor er naam shoho
     const appointments = await db.query(
       `SELECT a.appt_id, a.appt_date, a.time_slot, a.status,
               d.name AS doctor_name, dep.dept_name
        FROM appointment a
-       JOIN doctor d      ON a.doctor_id = d.doctor_id
+       JOIN doctor d       ON a.doctor_id = d.doctor_id
        JOIN department dep ON d.dept_id   = dep.dept_id
        WHERE a.patient_id = $1
        ORDER BY a.appt_date DESC`,
@@ -55,11 +76,12 @@ router.get('/:id', async (req, res, next) => {
 });
 
 
+// ---------- POST create ----------
 router.post('/', async (req, res, next) => {
   try {
     const { name, dob, gender, phone, address, blood_group } = req.body;
 
-    if (!name) {
+    if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
     }
 
@@ -67,23 +89,42 @@ router.post('/', async (req, res, next) => {
       `INSERT INTO patient (name, dob, gender, phone, address, blood_group)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [name, dob, gender, phone, address, blood_group]
+      [
+        name.trim(),
+        nz(dob),            // khali date → NULL
+        nz(gender),
+        nz(phone),
+        nz(address),
+        nz(blood_group)
+      ]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    // 23514 = CHECK constraint violation (bhul gender / blood group)
     if (err.code === '23514') {
-      return res.status(400).json({ error: 'Invalid value — check gender or blood group' });
+      return res.status(400).json({
+        error: 'Invalid value — check gender or blood group'
+      });
+    }
+    // 22007 / 22008 = bhul date format
+    if (err.code === '22007' || err.code === '22008') {
+      return res.status(400).json({ error: 'Invalid date of birth' });
     }
     next(err);
   }
 });
 
 
+// ---------- PUT update ----------
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, dob, gender, phone, address, blood_group } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
 
     const result = await db.query(
       `UPDATE patient
@@ -91,7 +132,15 @@ router.put('/:id', async (req, res, next) => {
            phone = $4, address = $5, blood_group = $6
        WHERE patient_id = $7
        RETURNING *`,
-      [name, dob, gender, phone, address, blood_group, id]
+      [
+        name.trim(),
+        nz(dob),
+        nz(gender),
+        nz(phone),
+        nz(address),
+        nz(blood_group),
+        id
+      ]
     );
 
     if (result.rows.length === 0) {
@@ -100,11 +149,20 @@ router.put('/:id', async (req, res, next) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    if (err.code === '23514') {
+      return res.status(400).json({
+        error: 'Invalid value — check gender or blood group'
+      });
+    }
+    if (err.code === '22007' || err.code === '22008') {
+      return res.status(400).json({ error: 'Invalid date of birth' });
+    }
     next(err);
   }
 });
 
 
+// ---------- DELETE ----------
 router.delete('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -118,6 +176,7 @@ router.delete('/:id', async (req, res, next) => {
 
     res.json({ message: 'Patient deleted', patient_id: result.rows[0].patient_id });
   } catch (err) {
+    // 23503 = FK violation — bill/admission ache, tai delete kora jabe na
     if (err.code === '23503') {
       return res.status(409).json({
         error: 'Cannot delete — this patient has bills or admissions linked'
