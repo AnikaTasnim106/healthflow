@@ -8,12 +8,13 @@
 import { useState } from 'react';
 import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
+import Appointments from './pages/Appointments';
 import './App.css';
 
 const NAV = [
   { id: 'patients', label: 'Patients', component: Patients },
   { id: 'doctors',  label: 'Doctors',  component: Doctors },
-  // { id: 'appointments', label: 'Appointments', component: Appointments },
+  { id: 'appointments', label: 'Appointments', component: Appointments },
   // { id: 'billing',      label: 'Billing',      component: Billing },
 ];
 

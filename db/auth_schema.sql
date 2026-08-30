@@ -1,0 +1,106 @@
+-- ============================================================
+--  HealthFlow — Authentication & Authorization schema
+--  Run AFTER schema.sql and seed.sql
+--
+--  Ei file ta alada rakha hoyeche jate schema.sql abar chalale
+--  user account gulo mucche na jay.
+-- ============================================================
+
+DROP TABLE IF EXISTS app_user CASCADE;
+
+-- ------------------------------------------------------------
+--  app_user — login credentials + role
+--
+--  role database e store hoy ar login er somoy EKHAN THEKE pora
+--  hoy. Client kokhono role pathay na — pathale seta ignore kora
+--  hoy. (Guideline 3.1: "must not be sent by the client")
+--
+--  patient_id / doctor_id: ekta login account kon patient ba kon
+--  doctor er, seta bole dey. Ei link tai object-level ownership
+--  check possible kore — "ei user ki ei record er malik?"
+-- ------------------------------------------------------------
+
+CREATE TABLE app_user (
+    user_id       SERIAL PRIMARY KEY,
+
+    email         VARCHAR(120) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,      -- bcrypt hash, plain text KOKHONO na
+    full_name     VARCHAR(80)  NOT NULL,
+
+    role          VARCHAR(15)  NOT NULL
+                  CHECK (role IN ('admin','receptionist','doctor','patient')),
+
+    -- role onujayi ekta link. patient role hole patient_id thakbe,
+    -- doctor role hole doctor_id. admin/receptionist er kono ta lage na.
+    patient_id    INT REFERENCES patient(patient_id)
+                  ON UPDATE CASCADE ON DELETE CASCADE,
+    doctor_id     INT REFERENCES doctor(doctor_id)
+                  ON UPDATE CASCADE ON DELETE CASCADE,
+
+    is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- patient role hole patient_id obosshoi lagbe, doctor role hole doctor_id.
+    -- admin/receptionist er duitai NULL thakbe.
+    CONSTRAINT chk_role_link CHECK (
+        (role = 'patient'      AND patient_id IS NOT NULL AND doctor_id IS NULL) OR
+        (role = 'doctor'       AND doctor_id  IS NOT NULL AND patient_id IS NULL) OR
+        (role IN ('admin','receptionist') AND patient_id IS NULL AND doctor_id IS NULL)
+    ),
+
+    -- ek patient er ekta-i account, ek doctor er ekta-i account
+    CONSTRAINT uq_user_patient UNIQUE (patient_id),
+    CONSTRAINT uq_user_doctor  UNIQUE (doctor_id)
+);
+
+CREATE INDEX idx_user_email ON app_user(email);
+CREATE INDEX idx_user_role  ON app_user(role);
+
+
+-- ------------------------------------------------------------
+--  Demo accounts
+--
+--  Ei hash gulo bcrypt diye banano, cost factor 10.
+--  Shob account er password:  Pass@123
+--
+--  ⚠️ Ei hash gulo demo er jonno. Notun account signup diye
+--     banale backend nijei hash banabe.
+-- ------------------------------------------------------------
+
+INSERT INTO app_user (email, password_hash, full_name, role, patient_id, doctor_id) VALUES
+
+-- ADMIN
+('admin@healthflow.com',
+ '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O',
+ 'System Administrator', 'admin', NULL, NULL),
+
+-- RECEPTIONIST
+('reception@healthflow.com',
+ '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O',
+ 'Front Desk', 'receptionist', NULL, NULL),
+
+-- DOCTORS (seed.sql er doctor_id 1 ar 3)
+('rezaul.karim@healthflow.com',
+ '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O',
+ 'Dr. Rezaul Karim', 'doctor', NULL, 1),
+
+('aminul.haque@healthflow.com',
+ '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O',
+ 'Dr. Aminul Haque', 'doctor', NULL, 3),
+
+-- PATIENTS (seed.sql er patient_id 1 ar 2)
+-- Ei duita account diye object-level ownership check demo kora jabe:
+-- rahim login kore /api/patients/2 e gele 403 pabe.
+('rahim.uddin@mail.com',
+ '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O',
+ 'Rahim Uddin', 'patient', 1, NULL),
+
+('fatema.khatun@mail.com',
+ '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O',
+ 'Fatema Khatun', 'patient', 2, NULL);
+
+
+-- ------------------------------------------------------------
+--  Check
+-- ------------------------------------------------------------
+-- SELECT user_id, email, full_name, role, patient_id, doctor_id FROM app_user;
