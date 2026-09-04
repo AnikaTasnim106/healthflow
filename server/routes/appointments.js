@@ -1,12 +1,7 @@
-// ============================================================
-//  routes/appointments.js
-// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-
-// GET all appointments (patient + doctor naam shoho)
 router.get('/', async (req, res, next) => {
   try {
     const { date, status } = req.query;
@@ -27,9 +22,6 @@ router.get('/', async (req, res, next) => {
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
-// GET available slots — ekta doctor er ekta din kon kon slot faka
-// ⚠️ Eta /:id er AGE thakte hobe, nahole Express "available-slots" ke id mone korbe
 router.get('/available-slots', async (req, res, next) => {
   try {
     const { doctor_id, date } = req.query;
@@ -38,7 +30,6 @@ router.get('/available-slots', async (req, res, next) => {
       return res.status(400).json({ error: 'doctor_id and date required' });
     }
 
-    // ei doctor er oi date e already booked slot gulo
     const booked = await db.query(
       `SELECT time_slot FROM appointment
        WHERE doctor_id = $1 AND appt_date = $2 AND status != 'Cancelled'`,
@@ -53,7 +44,6 @@ router.get('/available-slots', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET ek appointment + tar prescription (jodi thake)
 router.get('/:id', async (req, res, next) => {
   try {
     const appt = await db.query(
@@ -81,7 +71,6 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST — notun appointment book
 router.post('/', async (req, res, next) => {
   try {
     const { patient_id, doctor_id, schedule_id, appt_date, time_slot } = req.body;
@@ -95,7 +84,6 @@ router.post('/', async (req, res, next) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    // 23505 = UNIQUE violation → uq_doc_slot fire korlo
     if (err.code === '23505') {
       return res.status(409).json({
         error: 'Ei doctor er oi slot ta already booked'
@@ -105,7 +93,6 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// PATCH — status change kora (Completed / Cancelled / No-Show)
 router.patch('/:id/status', async (req, res, next) => {
   try {
     const { status } = req.body;

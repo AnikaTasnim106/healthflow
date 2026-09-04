@@ -1,13 +1,8 @@
-// ============================================================
-//  routes/admissions.js
-//  Admit (room status update shoho, TRANSACTION), discharge, available rooms
-// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET all admissions (patient + room info shoho)
 router.get('/', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -23,7 +18,6 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET available rooms — ⚠️ /:id er AGE thakte hobe
 router.get('/available-rooms', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -36,7 +30,6 @@ router.get('/available-rooms', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET ek admission — details shoho
 router.get('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -56,9 +49,6 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST — notun admission (patient ke room e admit kora) — TRANSACTION
-// Admission banano + room status 'Occupied' kora ekshathe hoy,
-// ekta fail korle duitai rollback hoye jabe
 router.post('/', async (req, res, next) => {
   try {
     const { patient_id, room_no, admit_date } = req.body;
@@ -68,7 +58,6 @@ router.post('/', async (req, res, next) => {
     }
 
     const admission = await db.withTransaction(async (client) => {
-      // room ta ekhon available ache kina check kora
       const roomCheck = await client.query(
         `SELECT status FROM room WHERE room_no = $1`,
         [room_no]
@@ -103,7 +92,6 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// PATCH /:id/discharge — patient ke discharge kora, room abar available kora
 router.patch('/:id/discharge', async (req, res, next) => {
   try {
     const { id } = req.params;

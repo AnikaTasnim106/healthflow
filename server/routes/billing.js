@@ -1,12 +1,9 @@
-// ============================================================
-//  routes/billing.js
-// ============================================================
+
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET all bills
 router.get('/', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -23,8 +20,6 @@ router.get('/', async (req, res, next) => {
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
-// GET /due — jader bill baki ache
 router.get('/due', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -42,7 +37,6 @@ router.get('/due', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET ek bill — item ar payment shoho
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -68,7 +62,6 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST — bill + tar sob item ekshathe banano (TRANSACTION)
 router.post('/', async (req, res, next) => {
   try {
     const { patient_id, admission_id, items } = req.body;
@@ -107,7 +100,6 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /:id/payment — payment add + pay_status recalculate
 router.post('/:id/payment', async (req, res, next) => {
   try {
     const { id } = req.params;

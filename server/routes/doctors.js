@@ -1,17 +1,11 @@
-// ============================================================
-//  routes/doctors.js
-// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// Form theke khali field ashle '' ashe — Postgres er NUMERIC/DATE
-// column '' nite pare na, NULL lage.
 const nz = (v) => (v === '' || v === undefined ? null : v);
 
 
-// ---------- GET all (department naam shoho) ----------
 router.get('/', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -26,8 +20,6 @@ router.get('/', async (req, res, next) => {
 });
 
 
-// ---------- GET ek doctor er weekly schedule ----------
-// ⚠️ /:id/schedule specific, tai /:id er upore rakha
 router.get('/:id/schedule', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -43,7 +35,6 @@ router.get('/:id/schedule', async (req, res, next) => {
 });
 
 
-// ---------- GET ek doctor er details ----------
 router.get('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -62,7 +53,6 @@ router.get('/:id', async (req, res, next) => {
 });
 
 
-// ---------- POST notun doctor ----------
 router.post('/', async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
@@ -88,15 +78,12 @@ router.post('/', async (req, res, next) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    // 23505 = UNIQUE violation (phone already ache)
     if (err.code === '23505') {
       return res.status(409).json({ error: 'This phone number is already registered' });
     }
-    // 23503 = FK violation (dept_id database e nai)
     if (err.code === '23503') {
       return res.status(400).json({ error: 'Selected department does not exist' });
     }
-    // 23514 = CHECK violation (fee negative)
     if (err.code === '23514') {
       return res.status(400).json({ error: 'Consultation fee cannot be negative' });
     }
@@ -104,8 +91,6 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-
-// ---------- PUT update ----------
 router.put('/:id', async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
@@ -145,8 +130,6 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-
-// ---------- DELETE ----------
 router.delete('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -159,7 +142,6 @@ router.delete('/:id', async (req, res, next) => {
     }
     res.json({ message: 'Doctor deleted', doctor_id: result.rows[0].doctor_id });
   } catch (err) {
-    // 23503 = FK violation — appointment ache
     if (err.code === '23503') {
       return res.status(409).json({
         error: 'Cannot delete — this doctor has appointments linked'

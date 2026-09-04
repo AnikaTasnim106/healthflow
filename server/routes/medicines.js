@@ -1,14 +1,8 @@
-// ============================================================
-//  routes/medicines.js
-//  Prescription form er medicine dropdown er jonno lagbe.
-//  med_id ekta FK, tai option gulo DB theke ashte hobe.
-// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET /low-stock — ⚠️ /:id er AGE thakte hobe
 router.get('/low-stock', async (req, res, next) => {
   try {
     const threshold = Number(req.query.threshold) || 1500;
@@ -23,7 +17,6 @@ router.get('/low-stock', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET all medicines (catalog)
 router.get('/', async (req, res, next) => {
   try {
     const result = await db.query(
@@ -35,7 +28,6 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET ek medicine
 router.get('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
