@@ -9,6 +9,79 @@ const api = axios.create({
   baseURL: 'http://localhost:5000/api',
 });
 
+// ============================================================
+//  ⚙️  ADJUST HERE  —  backend er auth ready hole SHUDHU EI
+//     BLOCK TA palte hobe. Onno kono file e hat dite hobe na.
+// ============================================================
+
+// 1) Endpoint er path
+const AUTH = {
+  login:    '/auth/login',
+  register: '/auth/register',
+  logout:   '/auth/logout',
+  me:       '/auth/me',
+};
+
+// 2) Login response theke token ar user kivabe ber korbo.
+//    Backend jodi { token, user } pathay — ei duita thik ache.
+//    Cookie use korle readToken ke () => null kore dao ar
+//    api.create e { withCredentials: true } add koro.
+const readToken = (data) => data.token;
+const readUser  = (data) => data.user;
+
+// 3) Protected request e header kivabe jabe
+const authHeader = (token) => ({ Authorization: `Bearer ${token}` });
+
+// ============================================================
+
+const TOKEN_KEY = 'healthflow_token';
+
+export const getToken   = () => localStorage.getItem(TOKEN_KEY);
+export const setToken   = (t) => localStorage.setItem(TOKEN_KEY, t);
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+// Protita request e token ta apni-apni juḱte jay
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) Object.assign(config.headers, authHeader(token));
+  return config;
+});
+
+// 401 ashle token ta purano/revoked — mucche dei
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) clearToken();
+    return Promise.reject(err);
+  }
+);
+
+// ---------- AUTH ----------
+export const apiLogin = async (email, password) => {
+  const res = await api.post(AUTH.login, { email, password });
+  const token = readToken(res.data);
+  if (token) setToken(token);
+  return readUser(res.data);
+};
+
+export const apiRegister = async (payload) => {
+  const res = await api.post(AUTH.register, payload);
+  return res.data;
+};
+
+export const apiLogout = async () => {
+  try {
+    await api.post(AUTH.logout);
+  } finally {
+    clearToken();          // server fail korleo local token muchi
+  }
+};
+
+export const apiMe = async () => {
+  const res = await api.get(AUTH.me);
+  return readUser(res.data);
+};
+
 // ---------- PATIENTS ----------
 export const getPatients   = (search = '') => api.get('/patients', { params: { search } });
 export const getPatient    = (id)          => api.get(`/patients/${id}`);

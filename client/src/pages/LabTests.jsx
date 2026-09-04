@@ -26,10 +26,13 @@ const prettyDate = (d) => {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 };
-
-// PATCH er URL e date lage — '2026-07-04' format e
-const isoDate = (d) => new Date(d).toISOString().slice(0, 10);
-
+const isoDate = (d) => {
+  const dt = new Date(d);
+  const y   = dt.getFullYear();
+  const m   = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 export default function LabTests() {
   const [view, setView] = useState('pending');       // 'pending' | 'history'
 

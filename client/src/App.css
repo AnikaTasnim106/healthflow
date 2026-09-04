@@ -420,3 +420,115 @@ body{
   .med-row{ grid-template-columns:1fr; }
   .med-row .item-no{ text-align:left; }
 }
+
+/* ============ auth gate (login / register) ============ */
+
+.gate{
+  min-height:100vh;
+  display:grid; place-items:center;
+  padding:30px 20px;
+  background:var(--canvas);
+}
+
+.gate-card{
+  width:100%; max-width:400px;
+  background:var(--chart);
+  border:1px solid var(--rule);
+  border-top:3px solid var(--spine);
+  border-radius:var(--r);
+  padding:28px 30px 30px;
+}
+
+.gate-brand{ margin-bottom:22px; }
+.gate-brand .mark{
+  font-family:var(--display);
+  font-size:23px; font-weight:800; letter-spacing:-0.7px;
+  color:var(--ink); display:block; line-height:1.1;
+}
+.gate-brand .sub{
+  font-family:var(--cond);
+  font-size:10.5px; letter-spacing:1.4px; text-transform:uppercase;
+  color:var(--ink-soft); margin-top:3px; display:block;
+}
+
+.gate-tabs{
+  display:flex; gap:2px;
+  border-bottom:1px solid var(--rule);
+  margin-bottom:20px;
+}
+.gate-tab{
+  background:none; border:none;
+  padding:8px 14px; margin-bottom:-1px;
+  font-family:var(--cond); font-size:12px;
+  letter-spacing:0.9px; text-transform:uppercase; font-weight:600;
+  color:var(--ink-soft); cursor:pointer;
+  border-bottom:2px solid transparent;
+}
+.gate-tab:hover{ color:var(--ink); }
+.gate-tab.on{ color:var(--spine); border-bottom-color:var(--spine); }
+
+.gate-fields{ display:grid; gap:14px; margin-bottom:20px; }
+.gate-fields label{
+  display:flex; flex-direction:column; gap:5px;
+  font-family:var(--cond);
+  font-size:11px; letter-spacing:0.9px; text-transform:uppercase;
+  color:var(--ink-soft); font-weight:600;
+}
+.gate-fields input{
+  padding:9px 11px;
+  border:1px solid var(--rule); border-radius:var(--r);
+  font-family:var(--sans); font-size:14px; color:var(--ink);
+  background:#fff;
+}
+.gate-fields input:focus{ outline:2px solid var(--spine); outline-offset:-1px; }
+
+.gate-submit{ width:100%; padding:10px; font-size:13px; }
+
+.gate-note{
+  margin:16px 0 0; font-size:12px; line-height:1.5;
+  color:var(--ink-soft);
+}
+
+/* ============ signed-in user block in the rail ============ */
+
+.rail-user{
+  margin-top:26px; padding:16px 20px 20px;
+  border-top:1px solid #1d3039;
+}
+.rail-user-name{ color:#e2ecf0; font-size:13.5px; font-weight:600; }
+.rail-user-role{
+  font-family:var(--cond);
+  font-size:10px; letter-spacing:1.3px; text-transform:uppercase;
+  color:#69848f; margin-top:2px;
+}
+.rail-signout{
+  margin-top:11px;
+  background:none; border:1px solid #294452; border-radius:var(--r);
+  color:#a9bdc6; cursor:pointer;
+  font-family:var(--cond); font-size:11px;
+  letter-spacing:0.9px; text-transform:uppercase; font-weight:600;
+  padding:5px 11px;
+}
+.rail-signout:hover{ border-color:#4d97b5; color:#fff; }
+
+/* ============ my records ============ */
+
+.mine-grid{
+  display:grid; gap:16px;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+}
+.mine-grid .sub{
+  font-family:var(--cond);
+  font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
+  display:block; margin-bottom:3px;
+}
+
+@media (max-width:860px){
+  .rail-user{
+    margin:0 0 0 auto; padding:8px 12px;
+    border-top:none; white-space:nowrap;
+    display:flex; align-items:center; gap:10px;
+  }
+  .rail-user-role{ display:none; }
+  .rail-signout{ margin-top:0; }
+}
