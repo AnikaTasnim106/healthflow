@@ -1,8 +1,14 @@
+// ============================================================
+//  routes/prescriptions.js
+// ============================================================
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
 
-router.get('/:id', async (req, res, next) => {
+// ---------- GET ek prescription (admin, receptionist, doctor) ----------
+router.get('/:id', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -35,7 +41,8 @@ router.get('/:id', async (req, res, next) => {
 });
 
 
-router.get('/patient/:patientId', async (req, res, next) => {
+// ---------- GET /patient/:patientId (ownership check) ----------
+router.get('/patient/:patientId', requireAuth, requireOwnPatientRecord('patientId'), async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT pr.presc_id, pr.presc_date, pr.diagnosis,
@@ -52,7 +59,8 @@ router.get('/patient/:patientId', async (req, res, next) => {
 });
 
 
-router.post('/', async (req, res, next) => {
+// ---------- POST notun prescription (shudhu doctor, admin) ----------
+router.post('/', requireAuth, requireRole('admin', 'doctor'), async (req, res, next) => {
   try {
     const { appt_id, diagnosis, medicines } = req.body;
 
@@ -83,7 +91,6 @@ router.post('/', async (req, res, next) => {
 
     res.status(201).json(prescription);
   } catch (err) {
-    
     if (err.code === '23505') {
       return res.status(409).json({
         error: 'Ei appointment er jonno already ekta prescription ache'

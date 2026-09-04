@@ -1,14 +1,14 @@
 // ============================================================
 //  routes/admissions.js
-//  Admit (room status update shoho, TRANSACTION), discharge, available rooms
 // ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
-// GET all admissions (patient + room info shoho)
-router.get('/', async (req, res, next) => {
+// ---------- GET all (admin, receptionist, doctor) ----------
+router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT ad.admission_id, ad.admit_date, ad.discharge_date,
@@ -23,8 +23,8 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET available rooms — ⚠️ /:id er AGE thakte hobe
-router.get('/available-rooms', async (req, res, next) => {
+// ---------- GET available rooms (admin, receptionist) ----------
+router.get('/available-rooms', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT room_no, room_type, daily_charge
@@ -36,8 +36,8 @@ router.get('/available-rooms', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET ek admission — details shoho
-router.get('/:id', async (req, res, next) => {
+// ---------- GET ek admission (ownership check) ----------
+router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT ad.*, p.name AS patient_name, p.phone,
@@ -52,14 +52,18 @@ router.get('/:id', async (req, res, next) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Admission not found' });
     }
+
+    const { role, patient_id } = req.user;
+    if (role === 'patient' && result.rows[0].patient_id !== patient_id) {
+      return res.status(403).json({ error: 'You can only access your own admission' });
+    }
+
     res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
 
-// POST — notun admission (patient ke room e admit kora) — TRANSACTION
-// Admission banano + room status 'Occupied' kora ekshathe hoy,
-// ekta fail korle duitai rollback hoye jabe
-router.post('/', async (req, res, next) => {
+// ---------- POST admit kora (admin, receptionist) — TRANSACTION ----------
+router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, room_no, admit_date } = req.body;
 
@@ -68,7 +72,6 @@ router.post('/', async (req, res, next) => {
     }
 
     const admission = await db.withTransaction(async (client) => {
-      // room ta ekhon available ache kina check kora
       const roomCheck = await client.query(
         `SELECT status FROM room WHERE room_no = $1`,
         [room_no]
@@ -103,8 +106,8 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// PATCH /:id/discharge — patient ke discharge kora, room abar available kora
-router.patch('/:id/discharge', async (req, res, next) => {
+// ---------- PATCH discharge (admin, receptionist) ----------
+router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { discharge_date } = req.body;

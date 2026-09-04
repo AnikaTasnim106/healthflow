@@ -1,13 +1,14 @@
 // ============================================================
-//  routes/appointments.js
+//  routes/appointments.js — FINAL (auth + available-slots fix + DELETE)
 // ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
-// GET all appointments (patient + doctor naam shoho)
-router.get('/', async (req, res, next) => {
+// ---------- GET all (admin, receptionist, doctor) ----------
+router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { date, status } = req.query;
 
@@ -28,9 +29,10 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET available slots — ekta doctor er ekta din kon kon slot faka
-// ⚠️ Eta /:id er AGE thakte hobe, nahole Express "available-slots" ke id mone korbe
-router.get('/available-slots', async (req, res, next) => {
+// ---------- GET available-slots — ⚠️ /:id er AGE, sob role e dorkar (booking er age) ----------
+// schedule er start_time/end_time/slot_duration theke shob slot generate kore,
+// tarpor already-booked gulo bad diye dey (guide er section 5.1 er pattern)
+router.get('/available-slots', requireAuth, async (req, res, next) => {
   try {
     const { doctor_id, date } = req.query;
 
@@ -38,23 +40,35 @@ router.get('/available-slots', async (req, res, next) => {
       return res.status(400).json({ error: 'doctor_id and date required' });
     }
 
-    // ei doctor er oi date e already booked slot gulo
-    const booked = await db.query(
-      `SELECT time_slot FROM appointment
-       WHERE doctor_id = $1 AND appt_date = $2 AND status != 'Cancelled'`,
+    const result = await db.query(
+      `SELECT slot_time
+       FROM doctor_schedule ds,
+       generate_series(
+           ds.start_time::time,
+           ds.end_time::time - (ds.slot_duration || ' minutes')::interval,
+           (ds.slot_duration || ' minutes')::interval
+       ) AS slot_time
+       WHERE ds.doctor_id = $1
+         AND ds.day_of_week = TRIM(TO_CHAR($2::date, 'Day'))
+         AND ds.is_active = TRUE
+         AND slot_time NOT IN (
+             SELECT time_slot FROM appointment
+             WHERE doctor_id = $1 AND appt_date = $2 AND status != 'Cancelled'
+         )
+       ORDER BY slot_time`,
       [doctor_id, date]
     );
 
     res.json({
       doctor_id,
       date,
-      booked_slots: booked.rows.map(r => r.time_slot)
+      available_slots: result.rows.map(r => r.slot_time)
     });
   } catch (err) { next(err); }
 });
 
-// GET ek appointment + tar prescription (jodi thake)
-router.get('/:id', async (req, res, next) => {
+// ---------- GET ek appointment (ownership check) ----------
+router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const appt = await db.query(
       `SELECT a.appt_id, a.appt_date, a.time_slot, a.status,
@@ -72,6 +86,11 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
+    const { role, patient_id } = req.user;
+    if (role === 'patient' && appt.rows[0].patient_id !== patient_id) {
+      return res.status(403).json({ error: 'You can only access your own appointments' });
+    }
+
     const presc = await db.query(
       `SELECT presc_id, presc_date, diagnosis FROM prescription WHERE appt_id = $1`,
       [req.params.id]
@@ -81,8 +100,8 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST — notun appointment book
-router.post('/', async (req, res, next) => {
+// ---------- POST book kora (admin, receptionist) ----------
+router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, doctor_id, schedule_id, appt_date, time_slot } = req.body;
 
@@ -95,7 +114,6 @@ router.post('/', async (req, res, next) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    // 23505 = UNIQUE violation → uq_doc_slot fire korlo
     if (err.code === '23505') {
       return res.status(409).json({
         error: 'Ei doctor er oi slot ta already booked'
@@ -105,8 +123,8 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// PATCH — status change kora (Completed / Cancelled / No-Show)
-router.patch('/:id/status', async (req, res, next) => {
+// ---------- PATCH status (admin, receptionist, doctor) ----------
+router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { status } = req.body;
 
@@ -125,6 +143,31 @@ router.patch('/:id/status', async (req, res, next) => {
     }
     next(err);
   }
+});
+
+// ---------- DELETE (cancel) — admin, receptionist, ba nijer appointment hole patient nijeo ----------
+// Soft-delete: row mucchi na, status 'Cancelled' kore dei (history rekhe dewar jonno)
+router.delete('/:id', requireAuth, async (req, res, next) => {
+  try {
+    const check = await db.query(`SELECT patient_id FROM appointment WHERE appt_id = $1`, [req.params.id]);
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const { role, patient_id } = req.user;
+    if (role === 'patient' && check.rows[0].patient_id !== patient_id) {
+      return res.status(403).json({ error: 'You can only cancel your own appointment' });
+    }
+    if (!['admin', 'receptionist', 'patient'].includes(role)) {
+      return res.status(403).json({ error: 'Not allowed to cancel appointments' });
+    }
+
+    const result = await db.query(
+      `UPDATE appointment SET status = 'Cancelled' WHERE appt_id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    res.json({ message: 'Appointment cancelled', appointment: result.rows[0] });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

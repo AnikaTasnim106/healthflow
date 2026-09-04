@@ -104,3 +104,25 @@ INSERT INTO app_user (email, password_hash, full_name, role, patient_id, doctor_
 --  Check
 -- ------------------------------------------------------------
 -- SELECT user_id, email, full_name, role, patient_id, doctor_id FROM app_user;
+
+-- ============================================================
+-- auth_sessions — logout ke SOTTIKARER invalidate korar jonno
+-- JWT normally stateless (logout korleo purono token kaj kore),
+-- tai amra token er shathe ekta session row রাখি DB te.
+-- Logout korle সেই row delete kore dei — tokhon token ar valid thake na,
+-- jodio token itself expire hoyni.
+--
+-- ⚠️ Ei table টা tomar app_user table er UPOR নির্ভর kore.
+--    ধরে নিয়েছি app_user er PK কলামের নাম "user_id".
+--    Jodi onno naam hoy (jemon "id"), সেটা এখানে বসাও।
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    session_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     INT NOT NULL REFERENCES app_user(user_id) ON DELETE CASCADE,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at  TIMESTAMP NOT NULL DEFAULT (NOW() + INTERVAL '7 days')
+);
+
+-- pgAdmin e ei extension ta lagbe UUID generate korar jonno
+CREATE EXTENSION IF NOT EXISTS pgcrypto;

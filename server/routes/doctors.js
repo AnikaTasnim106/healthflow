@@ -1,18 +1,17 @@
 // ============================================================
-//  routes/doctors.js
+//  routes/doctors.js — FINAL (auth + appointment count + schedule + patients)
 // ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
-// Form theke khali field ashle '' ashe — Postgres er NUMERIC/DATE
-// column '' nite pare na, NULL lage.
 const nz = (v) => (v === '' || v === undefined ? null : v);
 
 
-// ---------- GET all (department naam shoho) ----------
-router.get('/', async (req, res, next) => {
+// ---------- GET all (sob role) ----------
+router.get('/', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT d.doctor_id, d.name, d.specialization, d.phone,
@@ -26,9 +25,8 @@ router.get('/', async (req, res, next) => {
 });
 
 
-// ---------- GET ek doctor er weekly schedule ----------
-// ⚠️ /:id/schedule specific, tai /:id er upore rakha
-router.get('/:id/schedule', async (req, res, next) => {
+// ---------- GET ek doctor er weekly schedule (sob role) ----------
+router.get('/:id/schedule', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT schedule_id, day_of_week, start_time, end_time,
@@ -43,11 +41,68 @@ router.get('/:id/schedule', async (req, res, next) => {
 });
 
 
-// ---------- GET ek doctor er details ----------
-router.get('/:id', async (req, res, next) => {
+// ---------- POST notun schedule slot add (shudhu admin) ----------
+router.post('/:id/schedule', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    const { day_of_week, start_time, end_time, chamber_no, slot_duration, max_patients } = req.body;
+
+    if (!day_of_week || !start_time || !end_time) {
+      return res.status(400).json({ error: 'day_of_week, start_time, end_time required' });
+    }
+
+    const result = await db.query(
+      `INSERT INTO doctor_schedule
+         (doctor_id, day_of_week, start_time, end_time, chamber_no, slot_duration, max_patients)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        req.params.id, day_of_week, start_time, end_time,
+        nz(chamber_no),
+        slot_duration || 15,
+        max_patients || 20
+      ]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Ei doctor er oi din-e already ei start_time e schedule ache' });
+    }
+    if (err.code === '23514') {
+      return res.status(400).json({ error: 'Invalid day_of_week ba end_time start_time er age' });
+    }
+    next(err);
+  }
+});
+
+
+// ---------- GET /:id/patients — ei doctor ke jara dekhiyeche ----------
+router.get('/:id/patients', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
+  try {
+    const { role, doctor_id } = req.user;
+    // doctor role hole shudhu nijer patient list dekhte parbe
+    if (role === 'doctor' && doctor_id !== parseInt(req.params.id, 10)) {
+      return res.status(403).json({ error: 'You can only view your own patients' });
+    }
+
+    const result = await db.query(
+      `SELECT DISTINCT p.patient_id, p.name, p.phone, p.blood_group
+       FROM appointment a
+       JOIN patient p ON a.patient_id = p.patient_id
+       WHERE a.doctor_id = $1
+       ORDER BY p.name`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
+
+// ---------- GET ek doctor er details (+ total appointment count) ----------
+router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT d.*, dep.dept_name
+      `SELECT d.*, dep.dept_name,
+              (SELECT COUNT(*) FROM appointment a WHERE a.doctor_id = d.doctor_id) AS total_appointments
        FROM doctor d
        JOIN department dep ON d.dept_id = dep.dept_id
        WHERE d.doctor_id = $1`,
@@ -62,8 +117,8 @@ router.get('/:id', async (req, res, next) => {
 });
 
 
-// ---------- POST notun doctor ----------
-router.post('/', async (req, res, next) => {
+// ---------- POST notun doctor (shudhu admin) ----------
+router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
 
@@ -88,15 +143,12 @@ router.post('/', async (req, res, next) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    // 23505 = UNIQUE violation (phone already ache)
     if (err.code === '23505') {
       return res.status(409).json({ error: 'This phone number is already registered' });
     }
-    // 23503 = FK violation (dept_id database e nai)
     if (err.code === '23503') {
       return res.status(400).json({ error: 'Selected department does not exist' });
     }
-    // 23514 = CHECK violation (fee negative)
     if (err.code === '23514') {
       return res.status(400).json({ error: 'Consultation fee cannot be negative' });
     }
@@ -105,8 +157,8 @@ router.post('/', async (req, res, next) => {
 });
 
 
-// ---------- PUT update ----------
-router.put('/:id', async (req, res, next) => {
+// ---------- PUT update (shudhu admin) ----------
+router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
 
@@ -146,8 +198,8 @@ router.put('/:id', async (req, res, next) => {
 });
 
 
-// ---------- DELETE ----------
-router.delete('/:id', async (req, res, next) => {
+// ---------- DELETE (shudhu admin) ----------
+router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const result = await db.query(
       `DELETE FROM doctor WHERE doctor_id = $1 RETURNING doctor_id`,
@@ -159,7 +211,6 @@ router.delete('/:id', async (req, res, next) => {
     }
     res.json({ message: 'Doctor deleted', doctor_id: result.rows[0].doctor_id });
   } catch (err) {
-    // 23503 = FK violation — appointment ache
     if (err.code === '23503') {
       return res.status(409).json({
         error: 'Cannot delete — this doctor has appointments linked'
