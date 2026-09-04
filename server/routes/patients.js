@@ -1,12 +1,17 @@
+// ============================================================
+//  routes/patients.js — auth middleware lagano hoyeche
+//  Ei pattern ta baki shob route e (doctors, appointments, billing,
+//  admissions, prescriptions, labtests) copy koro
+// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
 
-const nz = (v) => (v === '' || v === undefined ? null : v);
 
-
-router.get('/', async (req, res, next) => {
+// ---------- GET all (admin, receptionist, doctor dekhte pare — patient na) ----------
+router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { search = '', limit = 50, offset = 0 } = req.query;
 
@@ -20,13 +25,15 @@ router.get('/', async (req, res, next) => {
     );
 
     res.json(result.rows);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 
-router.get('/:id', async (req, res, next) => {
+// ---------- GET one (+ appointment history) ----------
+// requireOwnPatientRecord: admin/receptionist/doctor shobar data dekhte pare,
+// kintu patient shudhu NIJER id (URL er :id) match korle dekhte parbe —
+// eta e object-level ownership check
+router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -37,11 +44,12 @@ router.get('/:id', async (req, res, next) => {
     if (patient.rows.length === 0) {
       return res.status(404).json({ error: 'Patient not found' });
     }
+
     const appointments = await db.query(
       `SELECT a.appt_id, a.appt_date, a.time_slot, a.status,
               d.name AS doctor_name, dep.dept_name
        FROM appointment a
-       JOIN doctor d       ON a.doctor_id = d.doctor_id
+       JOIN doctor d      ON a.doctor_id = d.doctor_id
        JOIN department dep ON d.dept_id   = dep.dept_id
        WHERE a.patient_id = $1
        ORDER BY a.appt_date DESC`,
@@ -52,17 +60,16 @@ router.get('/:id', async (req, res, next) => {
       ...patient.rows[0],
       appointments: appointments.rows
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 
-router.post('/', async (req, res, next) => {
+// ---------- POST create (shudhu admin/receptionist notun patient add korte pare) ----------
+router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { name, dob, gender, phone, address, blood_group } = req.body;
 
-    if (!name || !name.trim()) {
+    if (!name) {
       return res.status(400).json({ error: 'Name is required' });
     }
 
@@ -70,39 +77,24 @@ router.post('/', async (req, res, next) => {
       `INSERT INTO patient (name, dob, gender, phone, address, blood_group)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [
-        name.trim(),
-        nz(dob),           
-        nz(gender),
-        nz(phone),
-        nz(address),
-        nz(blood_group)
-      ]
+      [name, dob, gender, phone, address, blood_group]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23514') {
-      return res.status(400).json({
-        error: 'Invalid value — check gender or blood group'
-      });
-    }
-    if (err.code === '22007' || err.code === '22008') {
-      return res.status(400).json({ error: 'Invalid date of birth' });
+      return res.status(400).json({ error: 'Invalid value — check gender or blood group' });
     }
     next(err);
   }
 });
 
 
-router.put('/:id', async (req, res, next) => {
+// ---------- PUT update (admin/receptionist, ba nijer data hole patient nijeo) ----------
+router.put('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, dob, gender, phone, address, blood_group } = req.body;
-
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'Name is required' });
-    }
 
     const result = await db.query(
       `UPDATE patient
@@ -110,15 +102,7 @@ router.put('/:id', async (req, res, next) => {
            phone = $4, address = $5, blood_group = $6
        WHERE patient_id = $7
        RETURNING *`,
-      [
-        name.trim(),
-        nz(dob),
-        nz(gender),
-        nz(phone),
-        nz(address),
-        nz(blood_group),
-        id
-      ]
+      [name, dob, gender, phone, address, blood_group, id]
     );
 
     if (result.rows.length === 0) {
@@ -126,21 +110,12 @@ router.put('/:id', async (req, res, next) => {
     }
 
     res.json(result.rows[0]);
-  } catch (err) {
-    if (err.code === '23514') {
-      return res.status(400).json({
-        error: 'Invalid value — check gender or blood group'
-      });
-    }
-    if (err.code === '22007' || err.code === '22008') {
-      return res.status(400).json({ error: 'Invalid date of birth' });
-    }
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 
-router.delete('/:id', async (req, res, next) => {
+// ---------- DELETE (shudhu admin) ----------
+router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const result = await db.query(
       `DELETE FROM patient WHERE patient_id = $1 RETURNING patient_id`,

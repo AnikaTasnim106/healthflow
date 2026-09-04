@@ -1,9 +1,15 @@
+// ============================================================
+//  routes/labtests.js
+// ============================================================
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
 
 
-router.get('/catalog', async (req, res, next) => {
+// ---------- GET catalog (sob role) ----------
+router.get('/catalog', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT test_id, test_name, cost FROM lab_test ORDER BY test_name`
@@ -13,7 +19,8 @@ router.get('/catalog', async (req, res, next) => {
 });
 
 
-router.get('/pending', async (req, res, next) => {
+// ---------- GET pending (admin, receptionist, doctor) ----------
+router.get('/pending', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT pt.patient_id, p.name AS patient_name,
@@ -31,7 +38,8 @@ router.get('/pending', async (req, res, next) => {
 });
 
 
-router.get('/patient/:patientId', async (req, res, next) => {
+// ---------- GET /patient/:patientId (ownership check reuse kora holo) ----------
+router.get('/patient/:patientId', requireAuth, requireOwnPatientRecord('patientId'), async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT pt.test_id, lt.test_name, lt.cost,
@@ -48,7 +56,8 @@ router.get('/patient/:patientId', async (req, res, next) => {
 });
 
 
-router.post('/', async (req, res, next) => {
+// ---------- POST test assign (admin, receptionist, doctor) ----------
+router.post('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { patient_id, test_id, doctor_id, test_date } = req.body;
 
@@ -75,7 +84,8 @@ router.post('/', async (req, res, next) => {
 });
 
 
-router.patch('/:patientId/:testId/:testDate', async (req, res, next) => {
+// ---------- PATCH result add (admin, receptionist, doctor) ----------
+router.patch('/:patientId/:testId/:testDate', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { patientId, testId, testDate } = req.params;
     const { result: testResult } = req.body;

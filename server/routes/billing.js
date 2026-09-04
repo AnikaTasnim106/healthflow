@@ -1,10 +1,14 @@
-
+// ============================================================
+//  routes/billing.js — FINAL (auth + from-admission + revenue)
+// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
-router.get('/', async (req, res, next) => {
+// ---------- GET all bills (admin, receptionist) ----------
+router.get('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT b.bill_id, b.issue_date, b.total_amount, b.pay_status,
@@ -20,7 +24,9 @@ router.get('/', async (req, res, next) => {
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-router.get('/due', async (req, res, next) => {
+
+// ---------- GET /due (admin, receptionist) — ⚠️ /:id er AGE ----------
+router.get('/due', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT b.bill_id, b.issue_date, b.total_amount, b.pay_status,
@@ -37,7 +43,63 @@ router.get('/due', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/:id', async (req, res, next) => {
+// ---------- GET /revenue — month-wise revenue summary (admin, receptionist) ----------
+// ⚠️ /:id er AGE thakte hobe
+router.get('/revenue', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT TO_CHAR(issue_date, 'YYYY-MM') AS month,
+              COUNT(*) AS bill_count,
+              SUM(total_amount) AS total_revenue,
+              SUM(total_amount) - COALESCE(SUM(paid.total_paid), 0) AS total_due
+       FROM bill b
+       LEFT JOIN (
+           SELECT bill_id, SUM(paid_amount) AS total_paid
+           FROM payment GROUP BY bill_id
+       ) paid ON b.bill_id = paid.bill_id
+       GROUP BY TO_CHAR(issue_date, 'YYYY-MM')
+       ORDER BY month DESC`
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
+// ---------- POST /from-admission/:id — admission theke auto bill (stored procedure) ----------
+// ⚠️ /:id er AGE thakte hobe
+// db/triggers.sql er sp_generate_admission_bill() procedure call kore
+router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
+  try {
+    const admissionId = req.params.id;
+
+    await db.query(`CALL sp_generate_admission_bill($1)`, [admissionId]);
+
+    // notun toiri hoya bill ta ber kore ferot pathai
+    const bill = await db.query(
+      `SELECT b.*, p.name AS patient_name
+       FROM bill b JOIN patient p ON b.patient_id = p.patient_id
+       WHERE b.admission_id = $1
+       ORDER BY b.bill_id DESC LIMIT 1`,
+      [admissionId]
+    );
+
+    const items = await db.query(
+      `SELECT item_no, description, amount FROM bill_item
+       WHERE bill_id = $1 ORDER BY item_no`,
+      [bill.rows[0].bill_id]
+    );
+
+    res.status(201).json({ ...bill.rows[0], items: items.rows });
+  } catch (err) {
+    // procedure er ভিতরের RAISE EXCEPTION এখানে ধরা পড়বে
+    if (err.message && err.message.includes('not found')) {
+      return res.status(404).json({ error: err.message });
+    }
+    next(err);
+  }
+});
+
+// ---------- GET ek bill (ownership check) ----------
+router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -48,6 +110,11 @@ router.get('/:id', async (req, res, next) => {
     );
     if (bill.rows.length === 0) {
       return res.status(404).json({ error: 'Bill not found' });
+    }
+
+    const { role, patient_id } = req.user;
+    if (role === 'patient' && bill.rows[0].patient_id !== patient_id) {
+      return res.status(403).json({ error: 'You can only access your own bills' });
     }
 
     const items    = await db.query(
@@ -62,7 +129,8 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+// ---------- POST bill create (admin, receptionist) ----------
+router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, admission_id, items } = req.body;
 
@@ -100,7 +168,8 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/payment', async (req, res, next) => {
+// ---------- POST /:id/payment (admin, receptionist) ----------
+router.post('/:id/payment', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { method, paid_amount } = req.body;

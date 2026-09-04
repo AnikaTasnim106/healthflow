@@ -1,10 +1,10 @@
-
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
-router.get('/', async (req, res, next) => {
+// Sob role e department list dekhte pare (dropdown, browsing er jonno)
+router.get('/', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT dep.dept_id, dep.dept_name, dep.location,

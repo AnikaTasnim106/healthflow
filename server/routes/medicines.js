@@ -1,9 +1,14 @@
+// ============================================================
+//  routes/medicines.js
+// ============================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
-router.get('/low-stock', async (req, res, next) => {
+// ---------- GET low-stock (admin, receptionist) ----------
+router.get('/low-stock', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const threshold = Number(req.query.threshold) || 1500;
     const result = await db.query(
@@ -17,7 +22,8 @@ router.get('/low-stock', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/', async (req, res, next) => {
+// ---------- GET all (sob role — prescription form dropdown er jonno) ----------
+router.get('/', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT med_id, name, unit_price, stock_qty
@@ -28,7 +34,8 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/:id', async (req, res, next) => {
+// ---------- GET ek medicine (sob role) ----------
+router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT med_id, name, unit_price, stock_qty
