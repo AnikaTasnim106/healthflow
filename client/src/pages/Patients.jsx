@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import { getPatients, createPatient, deletePatient } from '../api';
+import { getPatients, createPatient, updatePatient, deletePatient } from '../api';
 
 // Blood group family drives the chart spine colour on each row.
 function spineOf(bg) {
@@ -25,6 +25,7 @@ export default function Patients() {
   const [error, setError]       = useState('');
   const [search, setSearch]     = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId]     = useState(null);   // null = notun, id = edit
 
   const emptyForm = {
     name: '', dob: '', gender: 'M',
@@ -48,16 +49,45 @@ export default function Patients() {
     }
   }
 
-  async function handleAdd() {
+  // ekta form, duita kaj — editId null hole create, na hole update
+  async function handleSave() {
     if (!form.name.trim()) { setError('Enter a name to register the patient.'); return; }
     try {
-      await createPatient(form);
-      setForm(emptyForm);
-      setShowForm(false);
+      setError('');
+      if (editId) {
+        await updatePatient(editId, form);
+      } else {
+        await createPatient(form);
+      }
+      closeForm();
       loadPatients();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not register this patient.');
+      setError(err.response?.data?.error ||
+        (editId ? 'Could not save the changes.' : 'Could not register this patient.'));
     }
+  }
+
+  // Edit e click korle form e existing data bhore dey.
+  // dob DB theke ISO timestamp e ashe, <input type="date"> ke
+  // 'YYYY-MM-DD' lage — tai kete nite hoy.
+  function startEdit(p) {
+    setEditId(p.patient_id);
+    setForm({
+      name:        p.name || '',
+      dob:         p.dob ? String(p.dob).slice(0, 10) : '',
+      gender:      p.gender || 'M',
+      phone:       p.phone || '',
+      address:     p.address || '',
+      blood_group: p.blood_group || 'A+',
+    });
+    setShowForm(true);
+    setError('');
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditId(null);
+    setForm(emptyForm);
   }
 
   async function handleDelete(id, name) {
@@ -87,7 +117,8 @@ export default function Patients() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button className="btn primary" onClick={() => setShowForm(!showForm)}>
+        <button className="btn primary"
+          onClick={() => (showForm ? closeForm() : setShowForm(true))}>
           {showForm ? 'Close' : 'Register patient'}
         </button>
       </div>
@@ -101,7 +132,9 @@ export default function Patients() {
 
       {showForm && (
         <div className="form">
-          <div className="form-title">New patient record</div>
+          <div className="form-title">
+            {editId ? `Edit patient record P-${String(editId).padStart(3, '0')}` : 'New patient record'}
+          </div>
           <div className="fields">
             <label>
               Full name
@@ -143,10 +176,10 @@ export default function Patients() {
             </label>
           </div>
           <div className="form-actions">
-            <button className="btn" onClick={() => { setShowForm(false); setForm(emptyForm); }}>
-              Cancel
+            <button className="btn" onClick={closeForm}>Cancel</button>
+            <button className="btn primary" onClick={handleSave}>
+              {editId ? 'Save changes' : 'Save record'}
             </button>
-            <button className="btn primary" onClick={handleAdd}>Save record</button>
           </div>
         </div>
       )}
@@ -187,6 +220,8 @@ export default function Patients() {
                   <td><span className="data">{p.phone || '—'}</span></td>
                   <td>{p.address || '—'}</td>
                   <td className="right">
+                    <button className="btn sm" onClick={() => startEdit(p)}>Edit</button>
+                    {' '}
                     <button className="btn ghost sm"
                       onClick={() => handleDelete(p.patient_id, p.name)}>
                       Remove

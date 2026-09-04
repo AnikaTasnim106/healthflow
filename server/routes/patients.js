@@ -9,6 +9,12 @@ const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
 
+// Form theke khali field ashle '' (khali string) ashe.
+// Postgres er DATE column '' nite pare na — NULL lage.
+const nz = (v) => (v === '' || v === undefined ? null : v);
+
+const STAFF = ['admin', 'receptionist', 'doctor'];
+
 
 // ---------- GET all (admin, receptionist, doctor dekhte pare — patient na) ----------
 router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
@@ -49,7 +55,7 @@ router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, 
       `SELECT a.appt_id, a.appt_date, a.time_slot, a.status,
               d.name AS doctor_name, dep.dept_name
        FROM appointment a
-       JOIN doctor d      ON a.doctor_id = d.doctor_id
+       JOIN doctor d       ON a.doctor_id = d.doctor_id
        JOIN department dep ON d.dept_id   = dep.dept_id
        WHERE a.patient_id = $1
        ORDER BY a.appt_date DESC`,
@@ -69,7 +75,7 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
   try {
     const { name, dob, gender, phone, address, blood_group } = req.body;
 
-    if (!name) {
+    if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
     }
 
@@ -77,7 +83,7 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
       `INSERT INTO patient (name, dob, gender, phone, address, blood_group)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [name, dob, gender, phone, address, blood_group]
+      [name.trim(), nz(dob), nz(gender), nz(phone), nz(address), nz(blood_group)]
     );
 
     res.status(201).json(result.rows[0]);
@@ -85,16 +91,33 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
     if (err.code === '23514') {
       return res.status(400).json({ error: 'Invalid value — check gender or blood group' });
     }
+    if (err.code === '22007' || err.code === '22008') {
+      return res.status(400).json({ error: 'Invalid date of birth' });
+    }
     next(err);
   }
 });
 
 
-// ---------- PUT update (admin/receptionist, ba nijer data hole patient nijeo) ----------
-router.put('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
+// ---------- PUT update — FULL record (shudhu staff) ----------
+//
+// ⚠️ FIELD-LEVEL AUTHORIZATION
+//
+// Ashol hospital e patient nijer name, DOB ba blood group palte pare na —
+// oigulo identity ar clinical data, front desk e verify kore palte hoy.
+// Patient shudhu contact details palte pare (nichey PATCH /:id/contact).
+//
+// Tai ei route ta requireRole('admin','receptionist') —
+// requireOwnPatientRecord na. Patient ekhane 403 pabe, tar
+// nijer record holeo.
+router.put('/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, dob, gender, phone, address, blood_group } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
 
     const result = await db.query(
       `UPDATE patient
@@ -102,7 +125,48 @@ router.put('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, 
            phone = $4, address = $5, blood_group = $6
        WHERE patient_id = $7
        RETURNING *`,
-      [name, dob, gender, phone, address, blood_group, id]
+      [name.trim(), nz(dob), nz(gender), nz(phone), nz(address), nz(blood_group), id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23514') {
+      return res.status(400).json({ error: 'Invalid value — check gender or blood group' });
+    }
+    if (err.code === '22007' || err.code === '22008') {
+      return res.status(400).json({ error: 'Invalid date of birth' });
+    }
+    next(err);
+  }
+});
+
+
+// ---------- PATCH contact details ----------
+//
+// Patient nijer phone ar address palte pare. Staff-o pare.
+//
+// ⚠️ Ei route ta SHUDHU phone ar address er UPDATE likhe.
+//    Keu body te blood_group ba name pathaleo seta IGNORE hoy —
+//    query te oi column gulo nei-i. Ei ta e asol enforcement;
+//    frontend e field disable kore rakha shudhu presentation.
+//
+// requireOwnPatientRecord: patient shudhu nijer id te parbe,
+// onner id dile 403.
+router.patch('/:id/contact', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { phone, address } = req.body;
+
+    const result = await db.query(
+      `UPDATE patient
+       SET phone = $1, address = $2
+       WHERE patient_id = $3
+       RETURNING *`,
+      [nz(phone), nz(address), id]
     );
 
     if (result.rows.length === 0) {
