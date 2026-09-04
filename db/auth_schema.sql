@@ -111,7 +111,17 @@ INSERT INTO app_user (email, password_hash, full_name, role, patient_id, doctor_
  '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O',
  'Fatema Khatun', 'patient', 2, NULL);
 
-
+INSERT INTO app_user (email, password_hash, full_name, role, doctor_id) VALUES
+('anika.tasnim@healthflow.com',   '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr.Anika Tasnim','doctor', 11);
+INSERT INTO app_user (email, password_hash, full_name, role, doctor_id) VALUES
+('nasrin.sultana@healthflow.com',   '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Nasrin Sultana',    'doctor', 2),
+('farhana.yasmin@healthflow.com',   '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Farhana Yasmin',    'doctor', 4),
+('tanvir.ahmed@healthflow.com',     '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Tanvir Ahmed',      'doctor', 5),
+('shirin.akter@healthflow.com',     '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Shirin Akter',      'doctor', 6),
+('mahbubur.rahman@healthflow.com',  '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Mahbubur Rahman',   'doctor', 7),
+('rokeya.begum@healthflow.com',     '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Rokeya Begum',      'doctor', 8),
+('kamrul.hasan@healthflow.com',     '$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Kamrul Hasan',      'doctor', 9),
+('sabrina.chowdhury@healthflow.com','$2b$10$mSqcLEn5OpUgab0jby5siuG27z6vNotFBO8mtElVrh2OnRlMVW6/O', 'Dr. Sabrina Chowdhury', 'doctor', 10);
 -- ------------------------------------------------------------
 --  Check
 -- ------------------------------------------------------------

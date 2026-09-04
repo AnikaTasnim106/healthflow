@@ -88,6 +88,7 @@ export const getPatient    = (id)          => api.get(`/patients/${id}`);
 export const createPatient = (data)        => api.post('/patients', data);
 export const updatePatient = (id, data)    => api.put(`/patients/${id}`, data);
 export const deletePatient = (id)          => api.delete(`/patients/${id}`);
+export const updateContact = (id, data)    => api.patch(`/patients/${id}/contact`, data);
 
 // ---------- DEPARTMENTS ----------
 export const getDepartments = () => api.get('/departments');
@@ -96,6 +97,13 @@ export const getDepartments = () => api.get('/departments');
 export const getDoctors        = ()   => api.get('/doctors');
 export const getDoctor         = (id) => api.get(`/doctors/${id}`);
 export const getDoctorSchedule = (id) => api.get(`/doctors/${id}/schedule`);
+// all=true — off kora slot gulo o ashe (doctor er nijer page e lage)
+export const getFullSchedule    = (id) => api.get(`/doctors/${id}/schedule`, { params: { all: true } });
+export const addScheduleSlot    = (id, data) => api.post(`/doctors/${id}/schedule`, data);
+export const toggleScheduleSlot = (id, scheduleId, is_active) =>
+  api.patch(`/doctors/${id}/schedule/${scheduleId}`, { is_active });
+export const deleteScheduleSlot = (id, scheduleId) =>
+  api.delete(`/doctors/${id}/schedule/${scheduleId}`);
 export const createDoctor      = (data)     => api.post('/doctors', data);
 export const updateDoctor      = (id, data) => api.put(`/doctors/${id}`, data);
 export const deleteDoctor      = (id)       => api.delete(`/doctors/${id}`);

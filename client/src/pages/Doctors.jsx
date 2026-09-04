@@ -16,7 +16,10 @@ export default function Doctors() {
   const [error, setError]     = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  const emptyForm = { name: '', specialization: '', phone: '', consult_fee: '', dept_id: '' };
+  const emptyForm = {
+    name: '', specialization: '', phone: '', consult_fee: '', dept_id: '',
+    email: '', password: '',
+  };
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -53,6 +56,12 @@ export default function Doctors() {
     if (!form.name.trim())  { setError('Enter a name to add the doctor.'); return; }
     if (!form.dept_id)      { setError('Choose a department.'); return; }
     try {
+      // email dile password o lagbe — backend eo check ache
+      if ((form.email && !form.password) || (!form.email && form.password)) {
+        setError('To create a login, fill in both email and password.');
+        return;
+      }
+
       await createDoctor({
         ...form,
         consult_fee: Number(form.consult_fee) || 0,
@@ -139,6 +148,29 @@ export default function Doctors() {
                 onChange={(e) => setForm({ ...form, consult_fee: e.target.value })} />
             </label>
           </div>
+
+          {/* Login account — optional. Dile backend ek transaction e
+              doctor row ar app_user row duitai banay, role 'doctor'
+              hardcode kore. */}
+          <div className="form-title" style={{ marginTop: 20 }}>
+            Login account &mdash; optional
+          </div>
+          <div className="fields">
+            <label>
+              Email
+              <input type="email" value={form.email} placeholder="doctor@healthflow.com"
+                onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </label>
+            <label>
+              Password
+              <input type="password" value={form.password} placeholder="At least 8 characters"
+                onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </label>
+          </div>
+          <p className="gate-note">
+            Leave both blank to add the doctor without a login. You can add
+            one later from the database.
+          </p>
           <div className="form-actions">
             <button className="btn" onClick={() => { setShowForm(false); setForm(emptyForm); }}>
               Cancel

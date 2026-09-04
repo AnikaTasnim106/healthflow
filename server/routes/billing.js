@@ -7,19 +7,31 @@ const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-// ---------- GET all bills (admin, receptionist) ----------
-router.get('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
+// ---------- GET all bills ----------
+//
+// admin / receptionist  → shob bill
+// patient               → SHUDHU NIJER bill
+//
+// ⚠️ Filter ta SQL er WHERE clause e, req.user.patient_id diye.
+//    Client kono id pathay na — token theke asha id use hoy.
+//    Tai patient chaileo onner bill dekhte parbe na.
+router.get('/', requireAuth, requireRole('admin', 'receptionist', 'patient'), async (req, res, next) => {
   try {
+    const { role, patient_id } = req.user;
+    const onlyMine = role === 'patient';
+
     const result = await db.query(
       `SELECT b.bill_id, b.issue_date, b.total_amount, b.pay_status,
               p.name AS patient_name,
               COALESCE(SUM(pay.paid_amount), 0) AS amount_paid,
               b.total_amount - COALESCE(SUM(pay.paid_amount), 0) AS due
        FROM bill b
-       JOIN patient p    ON b.patient_id = p.patient_id
-       LEFT JOIN payment pay ON b.bill_id = pay.bill_id
+       JOIN patient p        ON b.patient_id = p.patient_id
+       LEFT JOIN payment pay ON b.bill_id    = pay.bill_id
+       WHERE ($1::int IS NULL OR b.patient_id = $1)
        GROUP BY b.bill_id, p.name
-       ORDER BY b.issue_date DESC`
+       ORDER BY b.issue_date DESC`,
+      [onlyMine ? patient_id : null]
     );
     res.json(result.rows);
   } catch (err) { next(err); }
@@ -33,8 +45,8 @@ router.get('/due', requireAuth, requireRole('admin', 'receptionist'), async (req
               p.name AS patient_name, p.phone,
               b.total_amount - COALESCE(SUM(pay.paid_amount), 0) AS due_amount
        FROM bill b
-       JOIN patient p ON b.patient_id = p.patient_id
-       LEFT JOIN payment pay ON b.bill_id = pay.bill_id
+       JOIN patient p        ON b.patient_id = p.patient_id
+       LEFT JOIN payment pay ON b.bill_id    = pay.bill_id
        WHERE b.pay_status != 'Paid'
        GROUP BY b.bill_id, p.name, p.phone
        ORDER BY due_amount DESC`
@@ -64,7 +76,7 @@ router.get('/revenue', requireAuth, requireRole('admin', 'receptionist'), async 
   } catch (err) { next(err); }
 });
 
-// ---------- POST /from-admission/:id — admission theke auto bill (stored procedure) ----------
+// ---------- POST /from-admission/:id — admission theke auto bill ----------
 // ⚠️ /:id er AGE thakte hobe
 // db/triggers.sql er sp_generate_admission_bill() procedure call kore
 router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
@@ -73,7 +85,6 @@ router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptioni
 
     await db.query(`CALL sp_generate_admission_bill($1)`, [admissionId]);
 
-    // notun toiri hoya bill ta ber kore ferot pathai
     const bill = await db.query(
       `SELECT b.*, p.name AS patient_name
        FROM bill b JOIN patient p ON b.patient_id = p.patient_id
@@ -90,7 +101,6 @@ router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptioni
 
     res.status(201).json({ ...bill.rows[0], items: items.rows });
   } catch (err) {
-    // procedure er ভিতরের RAISE EXCEPTION এখানে ধরা পড়বে
     if (err.message && err.message.includes('not found')) {
       return res.status(404).json({ error: err.message });
     }
@@ -112,12 +122,13 @@ router.get('/:id', requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: 'Bill not found' });
     }
 
+    // OBJECT-LEVEL OWNERSHIP — patient shudhu nijer bill
     const { role, patient_id } = req.user;
     if (role === 'patient' && bill.rows[0].patient_id !== patient_id) {
       return res.status(403).json({ error: 'You can only access your own bills' });
     }
 
-    const items    = await db.query(
+    const items = await db.query(
       `SELECT item_no, description, amount FROM bill_item
        WHERE bill_id = $1 ORDER BY item_no`, [id]);
 

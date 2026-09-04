@@ -23,14 +23,14 @@ import { apiLogin, apiLogout, apiMe, getToken, clearToken } from './api';
 // ------------------------------------------------------------
 export const NAV_BY_ROLE = {
   admin: [
-    'patients', 'doctors', 'appointments',
+    'patients', 'doctors', 'schedule', 'appointments',
     'admissions', 'prescriptions', 'labtests', 'billing',
   ],
   receptionist: [
     'patients', 'appointments', 'admissions', 'billing',
   ],
   doctor: [
-    'patients', 'appointments', 'prescriptions', 'labtests',
+    'appointments', 'schedule', 'patients', 'prescriptions', 'labtests',
   ],
   patient: [
     'myrecords',

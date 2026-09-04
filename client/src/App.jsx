@@ -16,6 +16,7 @@ import Login from './pages/Login';
 import MyRecords from './pages/MyRecords';
 import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
+import Schedule from './pages/Schedule';
 import Appointments from './pages/Appointments';
 import Admissions from './pages/Admissions';
 import Prescriptions from './pages/Prescriptions';
@@ -29,6 +30,7 @@ const PAGES = {
   myrecords:     { label: 'My Records',    component: MyRecords },
   patients:      { label: 'Patients',      component: Patients },
   doctors:       { label: 'Doctors',       component: Doctors },
+  schedule:      { label: 'Schedule',      component: Schedule },
   appointments:  { label: 'Appointments',  component: Appointments },
   admissions:    { label: 'Admissions',    component: Admissions },
   prescriptions: { label: 'Prescriptions', component: Prescriptions },
