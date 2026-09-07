@@ -1,26 +1,8 @@
-// ============================================================
-//  auth.jsx
-//
-//  Duita jinis ei file e:
-//
-//  1. AuthProvider — ke login kora ache seta puro app er jonno
-//     ek jaygay rakhe. Jekono component <useAuth()> diye seta
-//     pete pare, props diye pathate hoy na.
-//
-//  2. NAV_BY_ROLE — kon role kon page dekhbe.
-//
-//     ⚠️ EI TA SHUDHU PRESENTATION. Guideline e clearly lekha:
-//     "Hiding a button on the frontend is presentation, not
-//     security." Asol check backend er middleware e hote hobe —
-//     ei list ta shudhu user ke ojotha page dekhay na.
-// ============================================================
+
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { apiLogin, apiLogout, apiMe, getToken, clearToken } from './api';
 
-// ------------------------------------------------------------
-//  Role onujayi kon tab dekhabe
-// ------------------------------------------------------------
 export const NAV_BY_ROLE = {
   admin: [
     'patients', 'doctors', 'schedule', 'appointments',
@@ -51,9 +33,6 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Page refresh korle token ekhono ache kina dekhe, ar thakle
-  // /me diye jene ney ke login kora ache. Backend na thakle
-  // ei call ta fail kore — tokhon shudhu logged-out obostha.
   useEffect(() => {
     async function restore() {
       if (!getToken()) { setLoading(false); return; }

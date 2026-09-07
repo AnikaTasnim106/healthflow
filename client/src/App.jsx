@@ -1,13 +1,4 @@
-// ============================================================
-//  App.jsx — auth gate + role-aware navigation
-//
-//  Login kora na thakle Login screen, thakle role onujayi
-//  nav ar page.
-//
-//  ⚠️ Ei nav filter ta SHUDHU presentation. Guideline:
-//     "Hiding a button on the frontend is presentation, not
-//     security." Asol check backend er middleware e.
-// ============================================================
+
 
 import { useState } from 'react';
 import { AuthProvider, useAuth, NAV_BY_ROLE, ROLE_LABEL } from './auth';
@@ -25,7 +16,6 @@ import Billing from './pages/Billing';
 
 import './App.css';
 
-// sob page ek jaygay. auth.jsx er NAV_BY_ROLE ei id gulo dhore.
 const PAGES = {
   myrecords:     { label: 'My Records',    component: MyRecords },
   patients:      { label: 'Patients',      component: Patients },
@@ -41,7 +31,6 @@ const PAGES = {
 function Shell() {
   const { user, loading, logout } = useAuth();
 
-  // ei role ta ki ki page dekhbe
   const allowed = user ? (NAV_BY_ROLE[user.role] || []) : [];
   const [active, setActive] = useState(null);
 
