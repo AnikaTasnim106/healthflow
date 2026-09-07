@@ -1,8 +1,4 @@
-/* ============================================================
-   HealthFlow — design system
-   Direction: the physical medical record. Folder-tab spines,
-   ruled forms, stamped status, monospace clinical data.
-   ============================================================ */
+
 
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -44,7 +40,6 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 
-/* ============ shell ============ */
 
 .app{
   display:grid;
@@ -99,7 +94,6 @@ body{
 .rail-link .n{ font-family:var(--mono); font-size:11px; color:#5c7480; }
 .rail-link.on .n{ color:#7fb4c8; }
 
-/* ============ page ============ */
 
 .page{ padding:26px 30px 70px; max-width:1180px; }
 
@@ -121,8 +115,6 @@ body{
 
 .toolbar{ display:flex; gap:10px; align-items:center; margin-bottom:16px; }
 .toolbar .search{ flex:1; }
-
-/* ============ controls ============ */
 
 .search{
   padding:8px 11px;
@@ -155,8 +147,6 @@ body{
 
 .btn.sm{ padding:4px 9px; font-size:11px; letter-spacing:0.6px; }
 
-/* ============ record table ============ */
-
 .records{
   background:var(--chart);
   border:1px solid var(--rule);
@@ -186,8 +176,6 @@ body{
 .table tbody tr:hover{ background:#f4f8f9; }
 .table td.right{ text-align:right; }
 
-/* SIGNATURE — chart spine: colored left edge per record,
-   like the tab on a physical medical-record folder. */
 .table td:first-child{
   padding-left:15px;
   border-left:3px solid var(--rule);
@@ -222,8 +210,6 @@ body{
   background:var(--spine-pale); color:var(--spine);
   min-width:34px; text-align:center;
 }
-
-/* ============ form ============ */
 
 .form{
   background:var(--chart);
@@ -265,8 +251,6 @@ body{
   border-top:1px solid var(--rule-soft);
 }
 
-/* ============ states ============ */
-
 .alert{
   display:flex; gap:10px; align-items:flex-start;
   background:var(--flag-pale);
@@ -298,8 +282,6 @@ body{
   color:var(--ink-faint);
 }
 
-/* ============ responsive ============ */
-
 @media (max-width:860px){
   .app{ grid-template-columns:1fr; }
   .rail{
@@ -324,8 +306,6 @@ body{
 @media (prefers-reduced-motion:reduce){
   *{ animation:none !important; transition:none !important; }
 }
-
-/* ============ billing — line items & detail ============ */
 
 .item-row{
   display:grid;
@@ -400,7 +380,6 @@ body{
   outline:2px solid var(--spine); outline-offset:-1px;
 }
 
-/* medicine line rows in the prescription form */
 .med-row{
   display:grid;
   grid-template-columns:26px minmax(150px,1.6fr) 1fr 1fr 1fr auto;
@@ -420,8 +399,6 @@ body{
   .med-row{ grid-template-columns:1fr; }
   .med-row .item-no{ text-align:left; }
 }
-
-/* ============ auth gate (login / register) ============ */
 
 .gate{
   min-height:100vh;
@@ -489,8 +466,6 @@ body{
   color:var(--ink-soft);
 }
 
-/* ============ signed-in user block in the rail ============ */
-
 .rail-user{
   margin-top:26px; padding:16px 20px 20px;
   border-top:1px solid #1d3039;
@@ -510,8 +485,6 @@ body{
   padding:5px 11px;
 }
 .rail-signout:hover{ border-color:#4d97b5; color:#fff; }
-
-/* ============ my records ============ */
 
 .mine-grid{
   display:grid; gap:16px;
