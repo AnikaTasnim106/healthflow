@@ -1,0 +1,25 @@
+HEALTHFLOW — DEMO ACCOUNTS
+Password for all:  Pass@123
+
+
+ADMIN
+admin@healthflow.com
+
+RECEPTIONIST
+reception@healthflow.com
+
+DOCTORS
+rezaul.karim@healthflow.com     Dr. Rezaul Karim   (id 1)
+aminul.haque@healthflow.com     Dr. Aminul Haque   (id 3)
+nasrin.sultana@healthflow.com       id 2
+farhana.yasmin@healthflow.com       id 4
+tanvir.ahmed@healthflow.com         id 5
+shirin.akter@healthflow.com         id 6
+mahbubur.rahman@healthflow.com      id 7
+rokeya.begum@healthflow.com         id 8
+kamrul.hasan@healthflow.com         id 9
+sabrina.chowdhury@healthflow.com    id 10
+PATIENTS
+rahim.uddin@mail.com            Rahim Uddin        (id 1)
+fatema.khatun@mail.com          Fatema Khatun      (id 2)
+
