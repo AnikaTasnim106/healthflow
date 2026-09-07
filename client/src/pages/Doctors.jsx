@@ -1,9 +1,3 @@
-// ============================================================
-//  Doctors.jsx
-//  Same pattern as Patients.jsx.
-//  The department dropdown needs GET /api/departments.
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import { getDoctors, createDoctor, deleteDoctor, getDepartments } from '../api';
 
@@ -41,8 +35,6 @@ export default function Doctors() {
     }
   }
 
-  // dept_id is a foreign key, so the options must come from the
-  // database. Hardcoding them would break on any FK mismatch.
   async function loadDepartments() {
     try {
       const res = await getDepartments();
@@ -56,7 +48,6 @@ export default function Doctors() {
     if (!form.name.trim())  { setError('Enter a name to add the doctor.'); return; }
     if (!form.dept_id)      { setError('Choose a department.'); return; }
     try {
-      // email dile password o lagbe — backend eo check ache
       if ((form.email && !form.password) || (!form.email && form.password)) {
         setError('To create a login, fill in both email and password.');
         return;
@@ -149,9 +140,6 @@ export default function Doctors() {
             </label>
           </div>
 
-          {/* Login account — optional. Dile backend ek transaction e
-              doctor row ar app_user row duitai banay, role 'doctor'
-              hardcode kore. */}
           <div className="form-title" style={{ marginTop: 20 }}>
             Login account &mdash; optional
           </div>

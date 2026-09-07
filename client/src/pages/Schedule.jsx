@@ -1,14 +1,3 @@
-// ============================================================
-//  Schedule.jsx
-//
-//  Doctor nijer chamber time thik kore. Admin je kono doctor er
-//  schedule dekhte ar palte pare.
-//
-//  ⚠️ Doctor er doctor_id token theke ashe (useAuth), URL ba
-//     form theke na. Ar backend eo requireOwnSchedule check
-//     kore — tai onner schedule e hat dewa jabe na.
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth';
 import {
@@ -19,7 +8,6 @@ import {
 const DAYS = ['Saturday', 'Sunday', 'Monday', 'Tuesday',
               'Wednesday', 'Thursday', 'Friday'];
 
-// '17:00:00' → '05:00 PM'
 const prettyTime = (t) => {
   if (!t) return '\u2014';
   const [h, m] = t.split(':');
@@ -33,7 +21,6 @@ export default function Schedule() {
   const { user } = useAuth();
   const isAdmin = user.role === 'admin';
 
-  // doctor hole nijer id, admin hole dropdown theke
   const [doctorId, setDoctorId] = useState(
     user.role === 'doctor' ? String(user.doctor_id) : ''
   );
@@ -64,7 +51,6 @@ export default function Schedule() {
     try {
       setLoading(true);
       setError('');
-      // all=true — off kora slot gulo o dekhabo
       const res = await getFullSchedule(doctorId);
       setSlots(res.data);
     } catch (err) {
@@ -90,7 +76,6 @@ export default function Schedule() {
       setNotice('Slot added.');
       loadSlots();
     } catch (err) {
-      // 409 = uq_doc_day_slot, 400 = chk_sched_time
       setError(err.response?.data?.error || 'Could not add this slot.');
     }
   }
@@ -168,7 +153,6 @@ export default function Schedule() {
         </div>
       )}
 
-      {/* ---------- add form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">New chamber slot</div>
@@ -216,7 +200,6 @@ export default function Schedule() {
         </div>
       )}
 
-      {/* ---------- list ---------- */}
       {!doctorId ? (
         <div className="empty">
           <p>No doctor selected.</p>

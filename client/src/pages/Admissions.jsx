@@ -1,15 +1,4 @@
-// ============================================================
-//  Admissions.jsx
-//
-//  Duita jinis ei page ta dekhay:
-//
-//  1. Admit korle backend ek TRANSACTION e admission insert
-//     kore AR room er status 'Occupied' kore. Ekta fail korle
-//     duitai rollback.
-//  2. Occupied room e abar admit korar chesta korle 409 ashe —
-//     schema er uq_room_active partial unique index fire kore.
-//     (Ek room e ekbare ekta-i active admission thakte pare.)
-// ============================================================
+
 
 import { useState, useEffect } from 'react';
 import {

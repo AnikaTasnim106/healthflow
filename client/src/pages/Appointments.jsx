@@ -1,31 +1,16 @@
-// ============================================================
-//  Appointments.jsx
-//
-//  Same pattern as Patients.jsx — state, useEffect, async
-//  handlers, JSX. Duita extra jinis ache:
-//
-//  1. Booking form e patient ar doctor dropdown lage, tai ei
-//     page load hole tinta jinis ane — appointment, patient,
-//     doctor.
-//  2. Doctor select korle tar schedule ane, jate kon din kon
-//     somoy tini boshen seta dekha jay.
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import {
   getAppointments, bookAppointment, updateApptStatus,
   getPatients, getDoctors, getDoctorSchedule,
 } from '../api';
 
-// Status onujayi stamp er rong
 const stampOf = (status) => {
   if (status === 'Completed') return 'clear';
   if (status === 'Scheduled') return 'hold';
   if (status === 'Cancelled') return 'flag';
-  return 'mute';                       // No-Show
+  return 'mute';
 };
 
-// '17:20:00' → '05:20 PM'
 const prettyTime = (t) => {
   if (!t) return '\u2014';
   const [h, m] = t.split(':');
@@ -35,7 +20,6 @@ const prettyTime = (t) => {
   return `${String(h12).padStart(2, '0')}:${m} ${suffix}`;
 };
 
-// '2026-07-04T00:00:00.000Z' → '04 Jul 2026'
 const prettyDate = (d) => {
   if (!d) return '\u2014';
   return new Date(d).toLocaleDateString('en-GB', {
@@ -54,7 +38,6 @@ export default function Appointments() {
   const [notice, setNotice]   = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  // filter
   const [filterDate, setFilterDate]     = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
@@ -64,13 +47,10 @@ export default function Appointments() {
   };
   const [form, setForm] = useState(emptyForm);
 
-  // filter palte gele list abar ane
   useEffect(() => { loadAppointments(); }, [filterDate, filterStatus]);
 
-  // dropdown er data — shudhu ekbar
   useEffect(() => { loadDropdowns(); }, []);
 
-  // doctor select korle tar schedule ane
   useEffect(() => {
     if (!form.doctor_id) { setSchedule([]); return; }
     getDoctorSchedule(form.doctor_id)
@@ -126,7 +106,6 @@ export default function Appointments() {
       setNotice('Appointment booked.');
       loadAppointments();
     } catch (err) {
-      // 409 = uq_doc_slot constraint fire korlo (same doctor, same date+time)
       setError(err.response?.data?.error || 'Could not book this appointment.');
     }
   }
@@ -153,7 +132,6 @@ export default function Appointments() {
         </span>
       </div>
 
-      {/* ---------- filters ---------- */}
       <div className="toolbar">
         <input
           className="search"
@@ -198,7 +176,6 @@ export default function Appointments() {
         </div>
       )}
 
-      {/* ---------- booking form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">Book an appointment</div>
@@ -231,8 +208,6 @@ export default function Appointments() {
               </select>
             </label>
 
-            {/* doctor select korle tar weekly schedule dekhay.
-                schedule_id appointment table e ekta FK. */}
             <label>
               Chamber slot
               <select value={form.schedule_id}
@@ -277,7 +252,6 @@ export default function Appointments() {
         </div>
       )}
 
-      {/* ---------- list ---------- */}
       {loading ? (
         <div className="loading">Loading appointments</div>
       ) : appts.length === 0 ? (

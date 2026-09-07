@@ -1,17 +1,3 @@
-// ============================================================
-//  LabTests.jsx
-//
-//  Ei page ta patient_test table er upor kaj kore — jeta amader
-//  M:N junction table (patient <-> lab_test), ar tar PK holo
-//  (patient_id, test_id, test_date) — teen ta column mile.
-//
-//  Ei jonno result add korte tin tai lagbe, shudhu ekta id na.
-//
-//  Duita view:
-//    Pending  — jei test er result ekhono ashe nai
-//    History  — ek patient er sob test, result shoho
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import {
   getPendingTests, getTestCatalog, getPatientTests,
@@ -34,7 +20,7 @@ const isoDate = (d) => {
   return `${y}-${m}-${day}`;
 };
 export default function LabTests() {
-  const [view, setView] = useState('pending');       // 'pending' | 'history'
+  const [view, setView] = useState('pending');
 
   const [pending, setPending]   = useState([]);
   const [catalog, setCatalog]   = useState([]);
@@ -49,7 +35,6 @@ export default function LabTests() {
   const [notice, setNotice]   = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  // kon row e result likha hocche + ki likha hocche
   const [editKey, setEditKey]   = useState(null);
   const [resultText, setResultText] = useState('');
 
@@ -58,7 +43,6 @@ export default function LabTests() {
 
   useEffect(() => { loadAll(); }, []);
 
-  // patient select korle tar history ane
   useEffect(() => {
     if (!historyId) { setHistory([]); return; }
     getPatientTests(historyId)
@@ -101,7 +85,6 @@ export default function LabTests() {
       setNotice('Test ordered.');
       loadAll();
     } catch (err) {
-      // 409 = eki patient, eki test, eki date already ache (composite PK)
       setError(err.response?.data?.error || 'Could not order this test.');
     }
   }
@@ -169,7 +152,6 @@ export default function LabTests() {
         </div>
       )}
 
-      {/* ---------- order form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">Order a lab test</div>
@@ -226,7 +208,6 @@ export default function LabTests() {
         </div>
       )}
 
-      {/* ---------- PENDING ---------- */}
       {view === 'pending' && (
         loading ? (
           <div className="loading">Loading pending tests</div>
@@ -290,7 +271,6 @@ export default function LabTests() {
         )
       )}
 
-      {/* ---------- HISTORY ---------- */}
       {view === 'history' && (
         <>
           <div className="toolbar">

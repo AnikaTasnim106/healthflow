@@ -1,16 +1,3 @@
-// ============================================================
-//  Billing.jsx
-//
-//  Ei page ta duita jinis extra kore:
-//
-//  1. Ekta bill row e click korle DETAIL khule — bill_item ar
-//     payment list ashe. bill_item amader WEAK ENTITY, tar
-//     partial key item_no ekhane dekha jay.
-//  2. Notun bill banate ekadhik item line add kora jay. Backend
-//     e oita ekta TRANSACTION e insert hoy — bill + sob item
-//     ekshathe, ekta fail korle sob rollback.
-// ============================================================
-
 import { useState, useEffect, Fragment } from 'react';
 import { getBills, getBill, createBill, addPayment, getPatients } from '../api';
 
@@ -26,7 +13,7 @@ const prettyDate = (d) => {
 const stampOf = (status) => {
   if (status === 'Paid') return 'clear';
   if (status === 'Partial') return 'hold';
-  return 'flag';                      // Unpaid
+  return 'flag';
 };
 
 export default function Billing() {
@@ -36,15 +23,12 @@ export default function Billing() {
   const [error, setError]       = useState('');
   const [onlyDue, setOnlyDue]   = useState(false);
 
-  // kon bill ta khola ache + tar detail
   const [openId, setOpenId]   = useState(null);
   const [detail, setDetail]   = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // payment form
   const [payForm, setPayForm] = useState({ method: 'Cash', paid_amount: '' });
 
-  // notun bill form
   const [showForm, setShowForm] = useState(false);
   const emptyForm = {
     patient_id: '',
@@ -71,7 +55,6 @@ export default function Billing() {
     }
   }
 
-  // row e click korle detail ane (ba bondho kore)
   async function toggleDetail(id) {
     if (openId === id) { setOpenId(null); setDetail(null); return; }
     setOpenId(id);
@@ -95,15 +78,14 @@ export default function Billing() {
       setError('');
       await addPayment(billId, { method: payForm.method, paid_amount: amount });
       setPayForm({ method: 'Cash', paid_amount: '' });
-      const res = await getBill(billId);   // detail refresh
+      const res = await getBill(billId);
       setDetail(res.data);
-      loadBills();                          // list e status/due refresh
+      loadBills();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not record this payment.');
     }
   }
 
-  // ---------- notun bill er item line ----------
   const addItemRow = () =>
     setForm({ ...form, items: [...form.items, { description: '', amount: '' }] });
 
@@ -167,7 +149,6 @@ export default function Billing() {
         </div>
       )}
 
-      {/* ---------- new bill form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">New bill</div>
@@ -225,7 +206,6 @@ export default function Billing() {
         </div>
       )}
 
-      {/* ---------- list ---------- */}
       {loading ? (
         <div className="loading">Loading bills</div>
       ) : shown.length === 0 ? (
@@ -273,7 +253,6 @@ export default function Billing() {
                     </td>
                   </tr>
 
-                  {/* ---------- expanded detail ---------- */}
                   {openId === b.bill_id && (
                     <tr className="detail-row">
                       <td colSpan={8}>
@@ -281,8 +260,6 @@ export default function Billing() {
                           <div className="loading">Loading details</div>
                         ) : (
                           <div className="detail">
-                            {/* bill_item — WEAK ENTITY.
-                                item_no shudhu ei bill er moddhe unique. */}
                             <div className="detail-block">
                               <div className="detail-head">Line items</div>
                               <table className="mini">
@@ -340,8 +317,6 @@ export default function Billing() {
                                 </table>
                               )}
 
-                              {/* payment add — backend e transaction e
-                                  payment insert + pay_status recalculate hoy */}
                               {detail.pay_status !== 'Paid' && (
                                 <div className="pay-form">
                                   <select value={payForm.method}

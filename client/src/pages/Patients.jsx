@@ -1,12 +1,6 @@
-// ============================================================
-//  Patients.jsx
-//  Reference page — state, useEffect, async handlers, JSX.
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import { getPatients, createPatient, updatePatient, deletePatient } from '../api';
 
-// Blood group family drives the chart spine colour on each row.
 function spineOf(bg) {
   if (!bg) return '';
   if (bg.startsWith('AB')) return 'ab';
@@ -25,7 +19,7 @@ export default function Patients() {
   const [error, setError]       = useState('');
   const [search, setSearch]     = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId]     = useState(null);   // null = notun, id = edit
+  const [editId, setEditId]     = useState(null);
 
   const emptyForm = {
     name: '', dob: '', gender: 'M',
@@ -49,7 +43,6 @@ export default function Patients() {
     }
   }
 
-  // ekta form, duita kaj — editId null hole create, na hole update
   async function handleSave() {
     if (!form.name.trim()) { setError('Enter a name to register the patient.'); return; }
     try {
@@ -67,9 +60,6 @@ export default function Patients() {
     }
   }
 
-  // Edit e click korle form e existing data bhore dey.
-  // dob DB theke ISO timestamp e ashe, <input type="date"> ke
-  // 'YYYY-MM-DD' lage — tai kete nite hoy.
   function startEdit(p) {
     setEditId(p.patient_id);
     setForm({

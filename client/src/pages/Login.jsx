@@ -1,8 +1,3 @@
-// ============================================================
-//  Login.jsx
-//  Login ar Register — ekta screen, upore toggle.
-// ============================================================
-
 import { useState } from 'react';
 import { useAuth } from '../auth';
 import { apiRegister } from '../api';
@@ -10,7 +5,7 @@ import { apiRegister } from '../api';
 export default function Login() {
   const { login } = useAuth();
 
-  const [mode, setMode] = useState('login');      // 'login' | 'register'
+  const [mode, setMode] = useState('login');
   const [busy, setBusy] = useState(false);
   const [error, setError]   = useState('');
   const [notice, setNotice] = useState('');
@@ -35,7 +30,6 @@ export default function Login() {
       setBusy(true);
       setError('');
       await login(form.email.trim(), form.password);
-      // safol hole App.jsx nijei dashboard e niye jabe
     } catch (err) {
       if (!err.response) {
         setError('Cannot reach the server. Is the backend running on port 5000?');
@@ -70,7 +64,6 @@ export default function Login() {
       if (!err.response) {
         setError('Cannot reach the server. Is the backend running on port 5000?');
       } else {
-        // 409 = ei email e account already ache
         setError(err.response.data?.error || 'Could not create the account.');
       }
     } finally {

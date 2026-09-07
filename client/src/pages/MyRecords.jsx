@@ -1,13 +1,3 @@
-// ============================================================
-//  MyRecords.jsx
-//  Patient role er landing page.
-//
-//  Ei page ta shudhu req.user er nijer patient_id diye request
-//  kore. Kintu asol suraksha ekhane na — backend er
-//  requireOwnPatient middleware e. Keu URL palte onno kono id
-//  chaileo server 403 dibe.
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth';
 import {
@@ -60,7 +50,6 @@ export default function MyRecords() {
       setError('');
       const id = user.patient_id;
 
-      // Promise.allSettled — ekta endpoint fail korleo baki gulo dekhabe
       const [p, pr, t, b] = await Promise.allSettled([
         getPatient(id),
         getPatientPrescriptions(id),
@@ -103,7 +92,6 @@ export default function MyRecords() {
         </div>
       )}
 
-      {/* ---------- profile ---------- */}
       {profile && (
         <div className="form" style={{ marginBottom: 22 }}>
           <div className="form-title">Personal details</div>
@@ -119,7 +107,6 @@ export default function MyRecords() {
         </div>
       )}
 
-      {/* ---------- appointments ---------- */}
       <div className="form" style={{ marginBottom: 22 }}>
         <div className="form-title">Appointments</div>
         {appointments.length === 0 ? (
@@ -143,7 +130,6 @@ export default function MyRecords() {
         )}
       </div>
 
-      {/* ---------- prescriptions ---------- */}
       <div className="form" style={{ marginBottom: 22 }}>
         <div className="form-title">Prescriptions</div>
         {prescriptions.length === 0 ? (
@@ -166,7 +152,6 @@ export default function MyRecords() {
         )}
       </div>
 
-      {/* ---------- lab tests ---------- */}
       <div className="form" style={{ marginBottom: 22 }}>
         <div className="form-title">Lab tests</div>
         {tests.length === 0 ? (
@@ -189,7 +174,6 @@ export default function MyRecords() {
         )}
       </div>
 
-      {/* ---------- bills ---------- */}
       <div className="form">
         <div className="form-title">Bills</div>
         {bills.length === 0 ? (

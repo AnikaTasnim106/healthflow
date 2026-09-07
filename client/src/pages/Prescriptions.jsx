@@ -1,19 +1,3 @@
-// ============================================================
-//  Prescriptions.jsx
-//
-//  Ei page ta amader sobcheye important M:N relationship dekhay:
-//  prescription <-> medicine, ar tar upor tinta RELATIONSHIP
-//  ATTRIBUTE — dosage, frequency, duration.
-//
-//  Ei tinta attribute na medicine table e rakha jay, na
-//  prescription table e — karon "koto dose" seta ekta nirdishto
-//  prescription ar ekta nirdishto medicine er JORAR property.
-//  Tai presc_medicine junction table e thake.
-//
-//  Backend e prescription + sob medicine ekta TRANSACTION e
-//  insert hoy.
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import {
   getPatients, getAppointments, getMedicines,
@@ -50,7 +34,6 @@ export default function Prescriptions() {
   };
   const [form, setForm] = useState(emptyForm);
 
-  // dropdown data — ekbar
   useEffect(() => {
     getPatients('').then((r) => setPatients(r.data)).catch(() => {});
     getMedicines()
@@ -58,7 +41,6 @@ export default function Prescriptions() {
       .catch(() => console.warn('Medicines endpoint not available yet'));
   }, []);
 
-  // patient select korle tar prescription ar appointment ane
   useEffect(() => {
     if (!patientId) { setList([]); setAppts([]); return; }
     loadForPatient();
@@ -76,8 +58,6 @@ export default function Prescriptions() {
         getAppointments({}),
       ]);
       setList(pr.data);
-      // ei patient er completed appointment gulo — prescription
-      // ekta appointment er sathe jora (1:1)
       setAppts(ap.data.filter(
         (a) => String(a.patient_id) === String(patientId)
       ));
@@ -104,7 +84,6 @@ export default function Prescriptions() {
     }
   }
 
-  // ---------- medicine line handling ----------
   const addMedRow = () => setForm({
     ...form,
     medicines: [...form.medicines, { med_id: '', dosage: '', frequency: '', duration: '' }],
@@ -150,7 +129,6 @@ export default function Prescriptions() {
       setNotice('Prescription saved.');
       loadForPatient();
     } catch (err) {
-      // 409 = ei appointment er already ekta prescription ache (1:1)
       setError(err.response?.data?.error || 'Could not save this prescription.');
     }
   }
@@ -199,15 +177,11 @@ export default function Prescriptions() {
         </div>
       )}
 
-      {/* ---------- write form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">Write a prescription</div>
 
           <div className="fields">
-            {/* prescription ekta appointment er sathe 1:1 jora.
-                appt_id e UNIQUE constraint ache, tai ek appointment
-                er duita prescription hobe na. */}
             <label>
               Appointment
               <select value={form.appt_id}
@@ -275,7 +249,6 @@ export default function Prescriptions() {
         </div>
       )}
 
-      {/* ---------- list ---------- */}
       {!patientId ? (
         <div className="empty">
           <p>No patient selected.</p>
@@ -322,7 +295,6 @@ export default function Prescriptions() {
         </div>
       )}
 
-      {/* ---------- detail ---------- */}
       {openId && (
         <div className="form" style={{ marginTop: 18 }}>
           {detailLoading || !detail ? (
@@ -339,8 +311,6 @@ export default function Prescriptions() {
                 {detail.diagnosis || 'Not recorded'}
               </p>
 
-              {/* presc_medicine — M:N junction table.
-                  dosage / frequency / duration relationship attribute. */}
               <table className="mini">
                 <thead>
                   <tr>
