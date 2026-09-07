@@ -15,13 +15,12 @@ const prettyDate = (d) => {
   });
 };
 
-// admit theke discharge (ba aaj) porjonto koto din
 function daysStayed(admit, discharge) {
   if (!admit) return 0;
   const start = new Date(admit);
   const end = discharge ? new Date(discharge) : new Date();
   const days = Math.floor((end - start) / 86400000);
-  return days < 1 ? 1 : days;            // ek diner kom holeo 1 din dhora hoy
+  return days < 1 ? 1 : days;            
 }
 
 export default function Admissions() {
@@ -72,9 +71,8 @@ export default function Admissions() {
       setForm(emptyForm);
       setShowForm(false);
       setNotice('Patient admitted.');
-      loadAll();                          // room list o refresh hobe
+      loadAll();                          
     } catch (err) {
-      // 409 = room ta already occupied
       setError(err.response?.data?.error || 'Could not admit this patient.');
     }
   }
@@ -83,7 +81,7 @@ export default function Admissions() {
     if (!window.confirm(`Discharge ${name} from room ${room}?`)) return;
     try {
       setError('');
-      await dischargePatient(id, {});     // date na dile backend CURRENT_DATE dhorbe
+      await dischargePatient(id, {});     
       setNotice(`${name} discharged. Room ${room} is now available.`);
       loadAll();
     } catch (err) {
