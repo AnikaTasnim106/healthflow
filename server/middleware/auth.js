@@ -1,12 +1,8 @@
-// ============================================================
-//  middleware/auth.js
-// ============================================================
+
 
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 
-// ---------- requireAuth: token check kore, user ke req.user e boshay ----------
-// Header e ei format e token asha lage: Authorization: Bearer <token>
 async function requireAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
@@ -24,11 +20,6 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    // ⚠️ Ei session ta ekhono DB te ache kina check kora — logout hole ei row
-    // delete hoye jay, tokhon eikhane fail korbe. Ei jonnoi logout "sotti" kaj kore.
-    //
-    // NOTE: app_user table e column er naam full_name, tai "AS name" alias
-    // diye niyechi — baki code sob req.user.name use kore.
     const session = await db.query(
       `SELECT s.session_id, s.expires_at,
               u.user_id, u.email, u.role, u.full_name AS name,
@@ -51,7 +42,6 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ error: 'Account is no longer active' });
     }
 
-    // req.user e user er info boshiye dilam — pore je kono route e use kora jabe
     req.user = session.rows[0];
     req.sessionId = payload.session_id;
     next();
@@ -59,9 +49,6 @@ async function requireAuth(req, res, next) {
     next(err);
   }
 }
-
-// ---------- requireRole: nirdishto role chara dhukte dibe na ----------
-// Byabohar: router.get('/', requireAuth, requireRole('admin', 'receptionist'), handler)
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {
@@ -74,16 +61,7 @@ function requireRole(...allowedRoles) {
   };
 }
 
-// ---------- requireOwnPatientRecord: OBJECT-LEVEL OWNERSHIP CHECK ----------
-//
-// Guideline 3.2.3: "A user must not be able to read, modify or delete another
-// user's data by changing an identifier in the request."
-//
-// paramName = URL parameter er naam jekhane patient_id ache (jemon '/:id' er 'id')
-// Admin/receptionist/doctor shob dekhte pare, patient shudhu nijer ta.
-//
-// Demo: rahim.uddin@mail.com (patient_id 1) login kore
-//       GET /api/patients/2 chaile 403 pabe.
+
 function requireOwnPatientRecord(paramName = 'id') {
   return (req, res, next) => {
     if (!req.user) {
@@ -92,12 +70,10 @@ function requireOwnPatientRecord(paramName = 'id') {
 
     const { role, patient_id } = req.user;
 
-    // Admin, receptionist, doctor — shobar data dekhte pare
     if (role === 'admin' || role === 'receptionist' || role === 'doctor') {
       return next();
     }
 
-    // Patient hole — shudhu nijer id match korle allow
     if (role === 'patient') {
       const requestedId = parseInt(req.params[paramName], 10);
       if (Number.isNaN(requestedId)) {
