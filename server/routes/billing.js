@@ -1,20 +1,10 @@
-// ============================================================
-//  routes/billing.js — FINAL (auth + from-admission + revenue)
-// ============================================================
+
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-// ---------- GET all bills ----------
-//
-// admin / receptionist  → shob bill
-// patient               → SHUDHU NIJER bill
-//
-// ⚠️ Filter ta SQL er WHERE clause e, req.user.patient_id diye.
-//    Client kono id pathay na — token theke asha id use hoy.
-//    Tai patient chaileo onner bill dekhte parbe na.
 router.get('/', requireAuth, requireRole('admin', 'receptionist', 'patient'), async (req, res, next) => {
   try {
     const { role, patient_id } = req.user;
@@ -37,7 +27,6 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'patient'), as
   } catch (err) { next(err); }
 });
 
-// ---------- GET /due (admin, receptionist) — ⚠️ /:id er AGE ----------
 router.get('/due', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -55,8 +44,6 @@ router.get('/due', requireAuth, requireRole('admin', 'receptionist'), async (req
   } catch (err) { next(err); }
 });
 
-// ---------- GET /revenue — month-wise revenue summary (admin, receptionist) ----------
-// ⚠️ /:id er AGE thakte hobe
 router.get('/revenue', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -76,9 +63,6 @@ router.get('/revenue', requireAuth, requireRole('admin', 'receptionist'), async 
   } catch (err) { next(err); }
 });
 
-// ---------- POST /from-admission/:id — admission theke auto bill ----------
-// ⚠️ /:id er AGE thakte hobe
-// db/triggers.sql er sp_generate_admission_bill() procedure call kore
 router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const admissionId = req.params.id;
@@ -108,7 +92,6 @@ router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptioni
   }
 });
 
-// ---------- GET ek bill (ownership check) ----------
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -122,7 +105,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: 'Bill not found' });
     }
 
-    // OBJECT-LEVEL OWNERSHIP — patient shudhu nijer bill
     const { role, patient_id } = req.user;
     if (role === 'patient' && bill.rows[0].patient_id !== patient_id) {
       return res.status(403).json({ error: 'You can only access your own bills' });
@@ -140,7 +122,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---------- POST bill create (admin, receptionist) ----------
 router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, admission_id, items } = req.body;
@@ -179,7 +160,6 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
   } catch (err) { next(err); }
 });
 
-// ---------- POST /:id/payment (admin, receptionist) ----------
 router.post('/:id/payment', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { id } = req.params;

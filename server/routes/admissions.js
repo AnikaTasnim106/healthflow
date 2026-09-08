@@ -1,13 +1,11 @@
-// ============================================================
-//  routes/admissions.js
-// ============================================================
+
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-// ---------- GET all (admin, receptionist, doctor) ----------
+
 router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -23,7 +21,6 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), asy
   } catch (err) { next(err); }
 });
 
-// ---------- GET available rooms (admin, receptionist) ----------
 router.get('/available-rooms', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -36,7 +33,6 @@ router.get('/available-rooms', requireAuth, requireRole('admin', 'receptionist')
   } catch (err) { next(err); }
 });
 
-// ---------- GET ek admission (ownership check) ----------
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
@@ -62,7 +58,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---------- POST admit kora (admin, receptionist) — TRANSACTION ----------
 router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, room_no, admit_date } = req.body;
@@ -106,7 +101,6 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
   }
 });
 
-// ---------- PATCH discharge (admin, receptionist) ----------
 router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { id } = req.params;

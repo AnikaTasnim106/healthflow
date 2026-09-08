@@ -1,6 +1,4 @@
-// ============================================================
-//  routes/doctors.js — FINAL (auth + schedule self-management)
-// ============================================================
+
 
 const express = require('express');
 const router = express.Router();
@@ -10,17 +8,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 
 const nz = (v) => (v === '' || v === undefined ? null : v);
 
-// ------------------------------------------------------------
-//  requireOwnSchedule — OBJECT-LEVEL OWNERSHIP for doctors
-//
-//  Admin je kono doctor er schedule palte pare.
-//  Doctor SHUDHU nijer ta — URL er :id tar nijer doctor_id
-//  na hole 403.
-//
-//  Doctor er nijer doctor_id token theke ashe (login er somoy
-//  DB theke pora), client theke na. Tai URL palte onner
-//  schedule e hat dewa jabe na.
-// ------------------------------------------------------------
+
 function requireOwnSchedule(req, res, next) {
   const { role, doctor_id } = req.user;
 
@@ -50,9 +38,6 @@ router.get('/', requireAuth, async (req, res, next) => {
 });
 
 
-// ---------- GET schedule ----------
-// ?all=true dile inactive slot gulo o ashbe (doctor nijer page e
-// dekhbe, kintu appointment booking e shudhu active gulo lagbe)
 router.get('/:id/schedule', requireAuth, async (req, res, next) => {
   try {
     const includeInactive = req.query.all === 'true';
@@ -77,7 +62,6 @@ router.get('/:id/schedule', requireAuth, async (req, res, next) => {
 });
 
 
-// ---------- POST notun slot (admin, ba doctor nijer ta) ----------
 router.post('/:id/schedule', requireAuth, requireOwnSchedule, async (req, res, next) => {
   try {
     const { day_of_week, start_time, end_time, chamber_no,
@@ -104,13 +88,11 @@ router.post('/:id/schedule', requireAuth, requireOwnSchedule, async (req, res, n
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    // 23505 = uq_doc_day_slot — eki din eki start_time e already ache
     if (err.code === '23505') {
       return res.status(409).json({
         error: 'You already have a slot starting at that time on that day',
       });
     }
-    // 23514 = chk_sched_time — end_time start_time er age
     if (err.code === '23514') {
       return res.status(400).json({
         error: 'End time must be after start time',
@@ -121,9 +103,6 @@ router.post('/:id/schedule', requireAuth, requireOwnSchedule, async (req, res, n
 });
 
 
-// ---------- PATCH slot on/off (admin, ba doctor nijer ta) ----------
-// Chhuti nile slot ta delete na kore off kore rakha jay —
-// purano appointment gulo schedule_id ference rakhe.
 router.patch('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, async (req, res, next) => {
   try {
     const { is_active } = req.body;
@@ -144,11 +123,8 @@ router.patch('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, async
 });
 
 
-// ---------- DELETE slot (admin, ba doctor nijer ta) ----------
 router.delete('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, async (req, res, next) => {
   try {
-    // doctor_id o WHERE e ache — keu onno doctor er schedule_id
-    // pathaleo mile na, tai delete hobe na
     const result = await db.query(
       `DELETE FROM doctor_schedule
        WHERE schedule_id = $1 AND doctor_id = $2
@@ -164,7 +140,6 @@ router.delete('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, asyn
 });
 
 
-// ---------- GET /:id/patients — ei doctor ke jara dekhiyeche ----------
 router.get('/:id/patients', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { role, doctor_id } = req.user;
@@ -185,7 +160,6 @@ router.get('/:id/patients', requireAuth, requireRole('admin', 'receptionist', 'd
 });
 
 
-// ---------- GET ek doctor er details ----------
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
@@ -206,18 +180,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 });
 
 
-// ---------- POST notun doctor (shudhu admin) ----------
-//
-// email + password dile ekta LOGIN ACCOUNT o banano hoy.
-//
-// ⚠️ role ekhane 'doctor' HARDCODE kora — client theke ashe na.
-//    Ar ei route ta requireRole('admin'), tai shudhu admin-i
-//    staff account banate pare. Self-registration (auth.js er
-//    /register) always 'patient' e hoy.
-//
-//    Doctor row ar app_user row EK TRANSACTION e — ekta fail
-//    korle duitai rollback. Nahole doctor thakto kintu login
-//    account nai (ba ulta) emon obostha hoto.
 router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id,
@@ -229,7 +191,6 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
     if (!dept_id) {
       return res.status(400).json({ error: 'Department is required' });
     }
-    // email dile password o lagbe, ar ulta
     if ((email && !password) || (!email && password)) {
       return res.status(400).json({
         error: 'To create a login, give both an email and a password',
@@ -268,7 +229,6 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
     res.status(201).json(created);
   } catch (err) {
     if (err.code === '23505') {
-      // phone ba email — duitatei UNIQUE ache
       if (err.constraint && err.constraint.includes('email')) {
         return res.status(409).json({ error: 'This email is already registered' });
       }
@@ -284,8 +244,6 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
   }
 });
 
-
-// ---------- PUT update (shudhu admin) ----------
 router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
@@ -323,7 +281,6 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => 
 });
 
 
-// ---------- DELETE (shudhu admin) ----------
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const result = await db.query(

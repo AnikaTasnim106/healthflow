@@ -1,13 +1,10 @@
-// ============================================================
-//  routes/appointments.js — FINAL (auth + available-slots fix + DELETE)
-// ============================================================
+
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-// ---------- GET all (admin, receptionist, doctor) ----------
 router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { date, status } = req.query;
@@ -29,9 +26,6 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), asy
   } catch (err) { next(err); }
 });
 
-// ---------- GET available-slots — ⚠️ /:id er AGE, sob role e dorkar (booking er age) ----------
-// schedule er start_time/end_time/slot_duration theke shob slot generate kore,
-// tarpor already-booked gulo bad diye dey (guide er section 5.1 er pattern)
 router.get('/available-slots', requireAuth, async (req, res, next) => {
   try {
     const { doctor_id, date } = req.query;
@@ -67,7 +61,6 @@ router.get('/available-slots', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---------- GET ek appointment (ownership check) ----------
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const appt = await db.query(
@@ -100,7 +93,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---------- POST book kora (admin, receptionist) ----------
 router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, doctor_id, schedule_id, appt_date, time_slot } = req.body;
@@ -123,7 +115,6 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
   }
 });
 
-// ---------- PATCH status (admin, receptionist, doctor) ----------
 router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { status } = req.body;
@@ -145,8 +136,6 @@ router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'd
   }
 });
 
-// ---------- DELETE (cancel) — admin, receptionist, ba nijer appointment hole patient nijeo ----------
-// Soft-delete: row mucchi na, status 'Cancelled' kore dei (history rekhe dewar jonno)
 router.delete('/:id', requireAuth, async (req, res, next) => {
   try {
     const check = await db.query(`SELECT patient_id FROM appointment WHERE appt_id = $1`, [req.params.id]);

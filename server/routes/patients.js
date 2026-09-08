@@ -1,22 +1,15 @@
-// ============================================================
-//  routes/patients.js — auth middleware lagano hoyeche
-//  Ei pattern ta baki shob route e (doctors, appointments, billing,
-//  admissions, prescriptions, labtests) copy koro
-// ============================================================
+
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
 
-// Form theke khali field ashle '' (khali string) ashe.
-// Postgres er DATE column '' nite pare na — NULL lage.
 const nz = (v) => (v === '' || v === undefined ? null : v);
 
 const STAFF = ['admin', 'receptionist', 'doctor'];
 
 
-// ---------- GET all (admin, receptionist, doctor dekhte pare — patient na) ----------
 router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { search = '', limit = 50, offset = 0 } = req.query;
@@ -35,10 +28,6 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), asy
 });
 
 
-// ---------- GET one (+ appointment history) ----------
-// requireOwnPatientRecord: admin/receptionist/doctor shobar data dekhte pare,
-// kintu patient shudhu NIJER id (URL er :id) match korle dekhte parbe —
-// eta e object-level ownership check
 router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -70,7 +59,6 @@ router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, 
 });
 
 
-// ---------- POST create (shudhu admin/receptionist notun patient add korte pare) ----------
 router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { name, dob, gender, phone, address, blood_group } = req.body;
@@ -99,17 +87,6 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
 });
 
 
-// ---------- PUT update — FULL record (shudhu staff) ----------
-//
-// ⚠️ FIELD-LEVEL AUTHORIZATION
-//
-// Ashol hospital e patient nijer name, DOB ba blood group palte pare na —
-// oigulo identity ar clinical data, front desk e verify kore palte hoy.
-// Patient shudhu contact details palte pare (nichey PATCH /:id/contact).
-//
-// Tai ei route ta requireRole('admin','receptionist') —
-// requireOwnPatientRecord na. Patient ekhane 403 pabe, tar
-// nijer record holeo.
 router.put('/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -145,17 +122,7 @@ router.put('/:id', requireAuth, requireRole('admin', 'receptionist'), async (req
 });
 
 
-// ---------- PATCH contact details ----------
-//
-// Patient nijer phone ar address palte pare. Staff-o pare.
-//
-// ⚠️ Ei route ta SHUDHU phone ar address er UPDATE likhe.
-//    Keu body te blood_group ba name pathaleo seta IGNORE hoy —
-//    query te oi column gulo nei-i. Ei ta e asol enforcement;
-//    frontend e field disable kore rakha shudhu presentation.
-//
-// requireOwnPatientRecord: patient shudhu nijer id te parbe,
-// onner id dile 403.
+
 router.patch('/:id/contact', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -178,7 +145,6 @@ router.patch('/:id/contact', requireAuth, requireOwnPatientRecord('id'), async (
 });
 
 
-// ---------- DELETE (shudhu admin) ----------
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const result = await db.query(

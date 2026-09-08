@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
-// Sob role e department list dekhte pare (dropdown, browsing er jonno)
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(

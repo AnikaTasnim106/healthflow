@@ -1,13 +1,10 @@
-// ============================================================
-//  routes/prescriptions.js
-// ============================================================
+
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
 
-// ---------- GET ek prescription (admin, receptionist, doctor) ----------
 router.get('/:id', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -41,7 +38,6 @@ router.get('/:id', requireAuth, requireRole('admin', 'receptionist', 'doctor'), 
 });
 
 
-// ---------- GET /patient/:patientId (ownership check) ----------
 router.get('/patient/:patientId', requireAuth, requireOwnPatientRecord('patientId'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -59,7 +55,6 @@ router.get('/patient/:patientId', requireAuth, requireOwnPatientRecord('patientI
 });
 
 
-// ---------- POST notun prescription (shudhu doctor, admin) ----------
 router.post('/', requireAuth, requireRole('admin', 'doctor'), async (req, res, next) => {
   try {
     const { appt_id, diagnosis, medicines } = req.body;
