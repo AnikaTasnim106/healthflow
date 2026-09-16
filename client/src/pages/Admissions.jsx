@@ -1,9 +1,8 @@
-
-
 import { useState, useEffect } from 'react';
+import { useAuth } from '../auth';
 import {
   getAdmissions, getAvailableRooms, admitPatient,
-  dischargePatient, getPatients,
+  dischargePatient, getPatients, generateBillFromAdmission,
 } from '../api';
 
 const taka = (n) => `\u09F3${Number(n || 0).toLocaleString('en-IN')}`;
@@ -20,10 +19,13 @@ function daysStayed(admit, discharge) {
   const start = new Date(admit);
   const end = discharge ? new Date(discharge) : new Date();
   const days = Math.floor((end - start) / 86400000);
-  return days < 1 ? 1 : days;            
+  return days < 1 ? 1 : days;
 }
 
 export default function Admissions() {
+  const { user } = useAuth();
+  const canBill = user.role === 'admin' || user.role === 'receptionist';
+
   const [admissions, setAdmissions] = useState([]);
   const [rooms, setRooms]           = useState([]);
   const [patients, setPatients]     = useState([]);
@@ -31,7 +33,8 @@ export default function Admissions() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [notice, setNotice]   = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [busyId, setBusyId]   = useState(null);
+  const [showForm, setShowForm]     = useState(false);
   const [onlyActive, setOnlyActive] = useState(false);
 
   const emptyForm = { patient_id: '', room_no: '', admit_date: '' };
@@ -71,7 +74,7 @@ export default function Admissions() {
       setForm(emptyForm);
       setShowForm(false);
       setNotice('Patient admitted.');
-      loadAll();                          
+      loadAll();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not admit this patient.');
     }
@@ -81,11 +84,35 @@ export default function Admissions() {
     if (!window.confirm(`Discharge ${name} from room ${room}?`)) return;
     try {
       setError('');
-      await dischargePatient(id, {});     
+      setBusyId(id);
+      await dischargePatient(id, {});
       setNotice(`${name} discharged. Room ${room} is now available.`);
       loadAll();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not discharge this patient.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleGenerateBill(a) {
+    if (!window.confirm(
+      `Generate a bill for ${a.patient_name}? Room charges, lab tests and doctor fees will be added automatically.`
+    )) return;
+    try {
+      setError('');
+      setBusyId(a.admission_id);
+      const res = await generateBillFromAdmission(a.admission_id);
+      const bill = res.data;
+      setNotice(
+        `Bill B-${String(bill.bill_id).padStart(3, '0')} created for ${a.patient_name} — ` +
+        `${bill.items?.length || 0} line items, ${taka(bill.total_amount)}. See the Billing page.`
+      );
+      loadAll();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not generate the bill.');
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -136,7 +163,6 @@ export default function Admissions() {
         </div>
       )}
 
-      {/* ---------- admit form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">Admit a patient</div>
@@ -154,8 +180,6 @@ export default function Admissions() {
               </select>
             </label>
 
-            {/* shudhu available room dekhay — backend er
-                GET /admissions/available-rooms theke ashe */}
             <label>
               Room
               <select value={form.room_no}
@@ -186,7 +210,6 @@ export default function Admissions() {
         </div>
       )}
 
-      {/* ---------- list ---------- */}
       {loading ? (
         <div className="loading">Loading admissions</div>
       ) : shown.length === 0 ? (
@@ -218,6 +241,7 @@ export default function Admissions() {
                 const active = !a.discharge_date;
                 const days = daysStayed(a.admit_date, a.discharge_date);
                 const cost = days * Number(a.daily_charge || 0);
+                const busy = busyId === a.admission_id;
 
                 return (
                   <tr key={a.admission_id}>
@@ -241,10 +265,15 @@ export default function Admissions() {
                     <td className="right"><span className="amount">{taka(cost)}</span></td>
                     <td className="right">
                       {active ? (
-                        <button className="btn sm"
+                        <button className="btn sm" disabled={busy}
                           onClick={() => handleDischarge(
                             a.admission_id, a.patient_name, a.room_no)}>
-                          Discharge
+                          {busy ? 'Working\u2026' : 'Discharge'}
+                        </button>
+                      ) : canBill ? (
+                        <button className="btn sm" disabled={busy}
+                          onClick={() => handleGenerateBill(a)}>
+                          {busy ? 'Working\u2026' : 'Generate bill'}
                         </button>
                       ) : (
                         <span className="stamp clear">Closed</span>

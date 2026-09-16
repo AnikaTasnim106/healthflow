@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -7,30 +5,49 @@ const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middle
 
 const nz = (v) => (v === '' || v === undefined ? null : v);
 
-const STAFF = ['admin', 'receptionist', 'doctor'];
-
-
 router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { search = '', limit = 50, offset = 0 } = req.query;
+    const { role, doctor_id } = req.user;
+    const onlyMine = role === 'doctor' ? doctor_id : null;
 
     const result = await db.query(
-      `SELECT patient_id, name, dob, gender, phone, address, blood_group
-       FROM patient
-       WHERE name ILIKE $1 OR phone ILIKE $1
-       ORDER BY patient_id
+      `SELECT p.patient_id, p.name, p.dob, p.gender,
+              p.phone, p.address, p.blood_group
+       FROM patient p
+       WHERE (p.name ILIKE $1 OR p.phone ILIKE $1)
+         AND ($4::int IS NULL OR EXISTS (
+               SELECT 1 FROM appointment a
+               WHERE a.patient_id = p.patient_id
+                 AND a.doctor_id  = $4
+             ))
+       ORDER BY p.patient_id
        LIMIT $2 OFFSET $3`,
-      [`%${search}%`, limit, offset]
+      [`%${search}%`, limit, offset, onlyMine]
     );
 
     res.json(result.rows);
   } catch (err) { next(err); }
 });
 
-
 router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { role, doctor_id } = req.user;
+
+    if (role === 'doctor') {
+      const seen = await db.query(
+        `SELECT 1 FROM appointment
+         WHERE patient_id = $1 AND doctor_id = $2
+         LIMIT 1`,
+        [id, doctor_id]
+      );
+      if (seen.rows.length === 0) {
+        return res.status(403).json({
+          error: 'You can only view patients who have an appointment with you'
+        });
+      }
+    }
 
     const patient = await db.query(
       `SELECT * FROM patient WHERE patient_id = $1`, [id]
@@ -47,8 +64,9 @@ router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, 
        JOIN doctor d       ON a.doctor_id = d.doctor_id
        JOIN department dep ON d.dept_id   = dep.dept_id
        WHERE a.patient_id = $1
+         AND ($2::int IS NULL OR a.doctor_id = $2)
        ORDER BY a.appt_date DESC`,
-      [id]
+      [id, role === 'doctor' ? doctor_id : null]
     );
 
     res.json({
@@ -57,7 +75,6 @@ router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, 
     });
   } catch (err) { next(err); }
 });
-
 
 router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
@@ -85,7 +102,6 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
     next(err);
   }
 });
-
 
 router.put('/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
@@ -121,12 +137,14 @@ router.put('/:id', requireAuth, requireRole('admin', 'receptionist'), async (req
   }
 });
 
-
-
 router.patch('/:id/contact', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { phone, address } = req.body;
+
+    if (req.user.role === 'doctor') {
+      return res.status(403).json({ error: 'Doctors cannot change contact details' });
+    }
 
     const result = await db.query(
       `UPDATE patient
@@ -143,7 +161,6 @@ router.patch('/:id/contact', requireAuth, requireOwnPatientRecord('id'), async (
     res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
-
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
@@ -166,6 +183,5 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) 
     next(err);
   }
 });
-
 
 module.exports = router;

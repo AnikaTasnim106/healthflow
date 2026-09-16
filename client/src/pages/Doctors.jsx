@@ -1,14 +1,23 @@
 import { useState, useEffect } from 'react';
-import { getDoctors, createDoctor, deleteDoctor, getDepartments } from '../api';
+import { useAuth } from '../auth';
+import {
+  getDoctors, createDoctor, updateDoctor, deleteDoctor, getDepartments,
+} from '../api';
 
 const taka = (n) => `\u09F3${Number(n || 0).toLocaleString('en-IN')}`;
 
 export default function Doctors() {
+  const { user } = useAuth();
+  const isAdmin = user.role === 'admin';
+
   const [doctors, setDoctors] = useState([]);
   const [depts, setDepts]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [notice, setNotice]   = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId]     = useState(null);
+  const [search, setSearch]     = useState('');
 
   const emptyForm = {
     name: '', specialization: '', phone: '', consult_fee: '', dept_id: '',
@@ -40,61 +49,110 @@ export default function Doctors() {
       const res = await getDepartments();
       setDepts(res.data);
     } catch (err) {
-      console.warn('Departments endpoint not available yet');
+      console.warn('Departments endpoint not available');
     }
   }
 
-  async function handleAdd() {
-    if (!form.name.trim())  { setError('Enter a name to add the doctor.'); return; }
-    if (!form.dept_id)      { setError('Choose a department.'); return; }
-    try {
-      if ((form.email && !form.password) || (!form.email && form.password)) {
-        setError('To create a login, fill in both email and password.');
-        return;
-      }
+  function startEdit(d) {
+    setEditId(d.doctor_id);
+    setForm({
+      name:           d.name || '',
+      specialization: d.specialization || '',
+      phone:          d.phone || '',
+      consult_fee:    d.consult_fee != null ? String(d.consult_fee) : '',
+      dept_id:        depts.find((x) => x.dept_name === d.dept_name)?.dept_id || '',
+      email: '', password: '',
+    });
+    setShowForm(true);
+    setError('');
+  }
 
-      await createDoctor({
-        ...form,
+  function closeForm() {
+    setShowForm(false);
+    setEditId(null);
+    setForm(emptyForm);
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) { setError('Enter a name.'); return; }
+    if (!form.dept_id)     { setError('Choose a department.'); return; }
+
+    if (!editId && ((form.email && !form.password) || (!form.email && form.password))) {
+      setError('To create a login, fill in both email and password.');
+      return;
+    }
+
+    try {
+      setError('');
+      const payload = {
+        name: form.name,
+        specialization: form.specialization,
+        phone: form.phone,
         consult_fee: Number(form.consult_fee) || 0,
         dept_id: Number(form.dept_id),
-      });
-      setForm(emptyForm);
-      setShowForm(false);
+      };
+
+      if (editId) {
+        await updateDoctor(editId, payload);
+        setNotice('Changes saved.');
+      } else {
+        await createDoctor({ ...payload, email: form.email, password: form.password });
+        setNotice(form.email ? 'Doctor added with a login account.' : 'Doctor added.');
+      }
+      closeForm();
       loadDoctors();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not add this doctor.');
+      setError(err.response?.data?.error ||
+        (editId ? 'Could not save the changes.' : 'Could not add this doctor.'));
     }
   }
 
   async function handleDelete(id, name) {
     if (!window.confirm(`Remove ${name} from the directory?`)) return;
     try {
+      setError('');
       await deleteDoctor(id);
+      setNotice(`${name} removed.`);
       loadDoctors();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not remove this doctor.');
     }
   }
 
+  const shown = search.trim()
+    ? doctors.filter((d) => {
+        const q = search.toLowerCase();
+        return (d.name || '').toLowerCase().includes(q)
+            || (d.specialization || '').toLowerCase().includes(q)
+            || (d.dept_name || '').toLowerCase().includes(q);
+      })
+    : doctors;
+
   return (
     <div>
       <div className="page-top">
         <h2>Doctors</h2>
         <span className="count">
-          {loading ? '\u2014' : `${doctors.length} on staff`}
+          {loading ? '\u2014' : `${shown.length} on staff`}
+          {search.trim() && ' matching'}
         </span>
       </div>
 
       <div className="toolbar">
-        <span style={{ flex: 1 }} />
-        <button
-          className="btn primary"
-          onClick={() => setShowForm(!showForm)}
-          disabled={depts.length === 0}
-          title={depts.length === 0 ? 'Departments endpoint not available yet' : ''}
-        >
-          {showForm ? 'Close' : 'Add doctor'}
-        </button>
+        <input
+          className="search"
+          placeholder="Search by name, specialization or department"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {isAdmin && (
+          <button className="btn primary"
+            onClick={() => (showForm ? closeForm() : setShowForm(true))}
+            disabled={depts.length === 0}
+            title={depts.length === 0 ? 'Departments endpoint not available' : ''}>
+            {showForm ? 'Close' : 'Add doctor'}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -103,10 +161,25 @@ export default function Doctors() {
           <button className="x" onClick={() => setError('')}>Dismiss</button>
         </div>
       )}
+      {notice && (
+        <div className="alert" style={{
+          background: 'var(--clear-pale)', borderColor: '#c8ddd0',
+          borderLeftColor: 'var(--clear)', color: 'var(--clear)',
+        }}>
+          <span>{notice}</span>
+          <button className="x" style={{ color: 'var(--clear)' }}
+            onClick={() => setNotice('')}>Dismiss</button>
+        </div>
+      )}
 
       {showForm && (
         <div className="form">
-          <div className="form-title">New doctor</div>
+          <div className="form-title">
+            {editId
+              ? `Edit doctor D-${String(editId).padStart(3, '0')}`
+              : 'New doctor'}
+          </div>
+
           <div className="fields">
             <label>
               Full name
@@ -140,40 +213,46 @@ export default function Doctors() {
             </label>
           </div>
 
-          <div className="form-title" style={{ marginTop: 20 }}>
-            Login account &mdash; optional
-          </div>
-          <div className="fields">
-            <label>
-              Email
-              <input type="email" value={form.email} placeholder="doctor@healthflow.com"
-                onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </label>
-            <label>
-              Password
-              <input type="password" value={form.password} placeholder="At least 8 characters"
-                onChange={(e) => setForm({ ...form, password: e.target.value })} />
-            </label>
-          </div>
-          <p className="gate-note">
-            Leave both blank to add the doctor without a login. You can add
-            one later from the database.
-          </p>
+          {!editId && (
+            <>
+              <div className="form-title" style={{ marginTop: 20 }}>
+                Login account &mdash; optional
+              </div>
+              <div className="fields">
+                <label>
+                  Email
+                  <input type="email" value={form.email} placeholder="doctor@healthflow.com"
+                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </label>
+                <label>
+                  Password
+                  <input type="password" value={form.password} placeholder="At least 8 characters"
+                    onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                </label>
+              </div>
+              <p className="gate-note">
+                Leave both blank to add the doctor without a login.
+              </p>
+            </>
+          )}
+
           <div className="form-actions">
-            <button className="btn" onClick={() => { setShowForm(false); setForm(emptyForm); }}>
-              Cancel
+            <button className="btn" onClick={closeForm}>Cancel</button>
+            <button className="btn primary" onClick={handleSave}>
+              {editId ? 'Save changes' : 'Save doctor'}
             </button>
-            <button className="btn primary" onClick={handleAdd}>Save doctor</button>
           </div>
         </div>
       )}
 
       {loading ? (
         <div className="loading">Loading directory</div>
-      ) : doctors.length === 0 ? (
+      ) : shown.length === 0 ? (
         <div className="empty">
-          <p>No doctors on staff.</p>
-          <p className="hint">Add the first doctor to build the directory.</p>
+          <p>{search.trim() ? 'No doctors match that search.' : 'No doctors on staff.'}</p>
+          <p className="hint">
+            {search.trim() ? 'Try a different name or department.' : 'Add the first doctor to build the directory.'}
+          </p>
         </div>
       ) : (
         <div className="records">
@@ -185,11 +264,11 @@ export default function Doctors() {
                 <th>Department</th>
                 <th>Phone</th>
                 <th className="right">Fee</th>
-                <th className="right">Action</th>
+                {isAdmin && <th className="right">Action</th>}
               </tr>
             </thead>
             <tbody>
-              {doctors.map((d) => (
+              {shown.map((d) => (
                 <tr key={d.doctor_id}>
                   <td><span className="id">D-{String(d.doctor_id).padStart(3, '0')}</span></td>
                   <td>
@@ -199,12 +278,16 @@ export default function Doctors() {
                   <td><span className="stamp mute">{d.dept_name}</span></td>
                   <td><span className="data">{d.phone || '\u2014'}</span></td>
                   <td className="right"><span className="amount">{taka(d.consult_fee)}</span></td>
-                  <td className="right">
-                    <button className="btn ghost sm"
-                      onClick={() => handleDelete(d.doctor_id, d.name)}>
-                      Remove
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td className="right">
+                      <button className="btn sm" onClick={() => startEdit(d)}>Edit</button>
+                      {' '}
+                      <button className="btn ghost sm"
+                        onClick={() => handleDelete(d.doctor_id, d.name)}>
+                        Remove
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

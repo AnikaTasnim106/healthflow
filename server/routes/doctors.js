@@ -22,8 +22,6 @@ function requireOwnSchedule(req, res, next) {
   return res.status(403).json({ error: 'Only a doctor or an administrator can change a schedule' });
 }
 
-
-// ---------- GET all (sob role) ----------
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(

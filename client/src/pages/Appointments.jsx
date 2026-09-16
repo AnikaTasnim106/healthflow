@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   getAppointments, bookAppointment, updateApptStatus,
-  getPatients, getDoctors, getDoctorSchedule,
+  getPatients, getDoctors, getAvailableSlots,
 } from '../api';
 
 const stampOf = (status) => {
@@ -28,10 +28,11 @@ const prettyDate = (d) => {
 };
 
 export default function Appointments() {
-  const [appts, setAppts]     = useState([]);
+  const [appts, setAppts]       = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors]   = useState([]);
-  const [schedule, setSchedule] = useState([]);
+  const [slots, setSlots]       = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -42,21 +43,21 @@ export default function Appointments() {
   const [filterStatus, setFilterStatus] = useState('');
 
   const emptyForm = {
-    patient_id: '', doctor_id: '', schedule_id: '',
-    appt_date: '', time_slot: '',
+    patient_id: '', doctor_id: '', appt_date: '',
+    schedule_id: '', time_slot: '',
   };
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => { loadAppointments(); }, [filterDate, filterStatus]);
-
   useEffect(() => { loadDropdowns(); }, []);
 
   useEffect(() => {
-    if (!form.doctor_id) { setSchedule([]); return; }
-    getDoctorSchedule(form.doctor_id)
-      .then((res) => setSchedule(res.data))
-      .catch(() => setSchedule([]));
-  }, [form.doctor_id]);
+    if (!form.doctor_id || !form.appt_date) {
+      setSlots([]);
+      return;
+    }
+    loadSlots(form.doctor_id, form.appt_date);
+  }, [form.doctor_id, form.appt_date]);
 
   async function loadAppointments() {
     try {
@@ -65,7 +66,6 @@ export default function Appointments() {
       const params = {};
       if (filterDate)   params.date   = filterDate;
       if (filterStatus) params.status = filterStatus;
-
       const res = await getAppointments(params);
       setAppts(res.data);
     } catch (err) {
@@ -82,8 +82,32 @@ export default function Appointments() {
       setPatients(p.data);
       setDoctors(d.data);
     } catch (err) {
-      console.error('Could not load patient/doctor lists', err);
+      console.error('Could not load patient or doctor lists', err);
     }
+  }
+
+  async function loadSlots(doctorId, date) {
+    try {
+      setSlotsLoading(true);
+      setSlots([]);
+      setForm((f) => ({ ...f, schedule_id: '', time_slot: '' }));
+      const res = await getAvailableSlots(doctorId, date);
+      setSlots(res.data.slots || []);
+    } catch (err) {
+      setSlots([]);
+      setError(err.response?.data?.error || 'Could not load available slots.');
+    } finally {
+      setSlotsLoading(false);
+    }
+  }
+
+  function pickSlot(value) {
+    if (!value) {
+      setForm({ ...form, schedule_id: '', time_slot: '' });
+      return;
+    }
+    const [scheduleId, timeSlot] = value.split('|');
+    setForm({ ...form, schedule_id: scheduleId, time_slot: timeSlot });
   }
 
   async function handleBook() {
@@ -102,6 +126,7 @@ export default function Appointments() {
         time_slot:   form.time_slot,
       });
       setForm(emptyForm);
+      setSlots([]);
       setShowForm(false);
       setNotice('Appointment booked.');
       loadAppointments();
@@ -122,6 +147,14 @@ export default function Appointments() {
 
   const clearFilters = () => { setFilterDate(''); setFilterStatus(''); };
 
+  const slotHint = () => {
+    if (!form.doctor_id) return 'Choose a doctor first';
+    if (!form.appt_date) return 'Choose a date first';
+    if (slotsLoading)    return 'Checking the schedule\u2026';
+    if (slots.length === 0) return 'No free slots that day';
+    return 'Choose a slot';
+  };
+
   return (
     <div>
       <div className="page-top">
@@ -133,18 +166,10 @@ export default function Appointments() {
       </div>
 
       <div className="toolbar">
-        <input
-          className="search"
-          type="date"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-        />
-        <select
-          className="search"
-          style={{ flex: '0 0 170px' }}
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
+        <input className="search" type="date" value={filterDate}
+          onChange={(e) => setFilterDate(e.target.value)} />
+        <select className="search" style={{ flex: '0 0 170px' }}
+          value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
           <option value="">All statuses</option>
           <option value="Scheduled">Scheduled</option>
           <option value="Completed">Completed</option>
@@ -196,32 +221,11 @@ export default function Appointments() {
             <label>
               Doctor
               <select value={form.doctor_id}
-                onChange={(e) => setForm({
-                  ...form, doctor_id: e.target.value, schedule_id: '',
-                })}>
+                onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}>
                 <option value="">Choose a doctor</option>
                 {doctors.map((d) => (
                   <option key={d.doctor_id} value={d.doctor_id}>
                     {d.name} &middot; {d.dept_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Chamber slot
-              <select value={form.schedule_id}
-                disabled={schedule.length === 0}
-                onChange={(e) => setForm({ ...form, schedule_id: e.target.value })}>
-                <option value="">
-                  {form.doctor_id
-                    ? (schedule.length ? 'Choose a slot' : 'No active schedule')
-                    : 'Choose a doctor first'}
-                </option>
-                {schedule.map((s) => (
-                  <option key={s.schedule_id} value={s.schedule_id}>
-                    {s.day_of_week} &middot; {prettyTime(s.start_time)}–{prettyTime(s.end_time)}
-                    {s.chamber_no ? ` \u00b7 ${s.chamber_no}` : ''}
                   </option>
                 ))}
               </select>
@@ -234,15 +238,33 @@ export default function Appointments() {
             </label>
 
             <label>
-              Time slot
-              <input type="time" value={form.time_slot}
-                onChange={(e) => setForm({ ...form, time_slot: e.target.value })} />
+              Available slot
+              <select
+                value={form.time_slot ? `${form.schedule_id}|${form.time_slot}` : ''}
+                disabled={slots.length === 0}
+                onChange={(e) => pickSlot(e.target.value)}>
+                <option value="">{slotHint()}</option>
+                {slots.map((s) => (
+                  <option key={`${s.schedule_id}-${s.slot_time}`}
+                    value={`${s.schedule_id}|${s.slot_time}`}>
+                    {prettyTime(s.slot_time)}
+                    {s.chamber_no ? ` \u00b7 ${s.chamber_no}` : ''}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
+          {form.doctor_id && form.appt_date && !slotsLoading && slots.length === 0 && (
+            <p className="gate-note">
+              This doctor has no active chamber hours on that day, or every
+              slot is already taken. Try another date.
+            </p>
+          )}
+
           <div className="form-actions">
             <button className="btn"
-              onClick={() => { setShowForm(false); setForm(emptyForm); }}>
+              onClick={() => { setShowForm(false); setForm(emptyForm); setSlots([]); }}>
               Cancel
             </button>
             <button className="btn primary" onClick={handleBook}>
@@ -306,7 +328,7 @@ export default function Appointments() {
                         </button>
                       </>
                     ) : (
-                      <span className="sub">—</span>
+                      <span className="sub">&mdash;</span>
                     )}
                   </td>
                 </tr>

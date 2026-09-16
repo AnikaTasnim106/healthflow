@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -14,9 +12,9 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), asy
               p.patient_id, p.name AS patient_name, p.phone,
               d.doctor_id, d.name AS doctor_name, dep.dept_name
        FROM appointment a
-       JOIN patient p      ON a.patient_id = p.patient_id
-       JOIN doctor d       ON a.doctor_id  = d.doctor_id
-       JOIN department dep ON d.dept_id    = dep.dept_id
+       JOIN patient p       ON a.patient_id = p.patient_id
+       JOIN doctor d        ON a.doctor_id  = d.doctor_id
+       JOIN department dep  ON d.dept_id    = dep.dept_id
        WHERE ($1::date IS NULL OR a.appt_date = $1)
          AND ($2::text IS NULL OR a.status    = $2)
        ORDER BY a.appt_date DESC, a.time_slot`,
@@ -31,32 +29,38 @@ router.get('/available-slots', requireAuth, async (req, res, next) => {
     const { doctor_id, date } = req.query;
 
     if (!doctor_id || !date) {
-      return res.status(400).json({ error: 'doctor_id and date required' });
+      return res.status(400).json({ error: 'doctor_id and date are required' });
     }
 
     const result = await db.query(
-      `SELECT slot_time
-       FROM doctor_schedule ds,
-       generate_series(
-           ds.start_time::time,
-           ds.end_time::time - (ds.slot_duration || ' minutes')::interval,
-           (ds.slot_duration || ' minutes')::interval
-       ) AS slot_time
-       WHERE ds.doctor_id = $1
+      `SELECT ds.schedule_id,
+              ds.chamber_no,
+              ds.day_of_week,
+              slot_ts::time AS slot_time
+       FROM doctor_schedule ds
+       CROSS JOIN LATERAL generate_series(
+           ($2::date + ds.start_time),
+           ($2::date + ds.end_time - (ds.slot_duration || ' minutes')::interval),
+           ((ds.slot_duration || ' minutes')::interval)
+       ) AS slot_ts
+       WHERE ds.doctor_id  = $1
+         AND ds.is_active  = TRUE
          AND ds.day_of_week = TRIM(TO_CHAR($2::date, 'Day'))
-         AND ds.is_active = TRUE
-         AND slot_time NOT IN (
-             SELECT time_slot FROM appointment
-             WHERE doctor_id = $1 AND appt_date = $2 AND status != 'Cancelled'
+         AND NOT EXISTS (
+             SELECT 1 FROM appointment a
+             WHERE a.doctor_id = $1
+               AND a.appt_date = $2
+               AND a.time_slot = slot_ts::time
+               AND a.status <> 'Cancelled'
          )
-       ORDER BY slot_time`,
+       ORDER BY slot_ts`,
       [doctor_id, date]
     );
 
     res.json({
-      doctor_id,
+      doctor_id: Number(doctor_id),
       date,
-      available_slots: result.rows.map(r => r.slot_time)
+      slots: result.rows
     });
   } catch (err) { next(err); }
 });
@@ -97,19 +101,28 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
   try {
     const { patient_id, doctor_id, schedule_id, appt_date, time_slot } = req.body;
 
+    if (!patient_id || !doctor_id || !appt_date || !time_slot) {
+      return res.status(400).json({
+        error: 'Patient, doctor, date and time slot are required'
+      });
+    }
+
     const result = await db.query(
       `INSERT INTO appointment
          (patient_id, doctor_id, schedule_id, appt_date, time_slot)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [patient_id, doctor_id, schedule_id, appt_date, time_slot]
+      [patient_id, doctor_id, schedule_id || null, appt_date, time_slot]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({
-        error: 'Ei doctor er oi slot ta already booked'
+        error: 'This doctor is already booked for that time slot'
       });
+    }
+    if (err.code === '23503') {
+      return res.status(400).json({ error: 'Patient or doctor does not exist' });
     }
     next(err);
   }
@@ -138,7 +151,10 @@ router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'd
 
 router.delete('/:id', requireAuth, async (req, res, next) => {
   try {
-    const check = await db.query(`SELECT patient_id FROM appointment WHERE appt_id = $1`, [req.params.id]);
+    const check = await db.query(
+      `SELECT patient_id FROM appointment WHERE appt_id = $1`,
+      [req.params.id]
+    );
     if (check.rows.length === 0) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
