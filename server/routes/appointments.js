@@ -3,9 +3,13 @@ const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
+router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor', 'patient'), async (req, res, next) => {
   try {
     const { date, status } = req.query;
+    const { role, doctor_id, patient_id } = req.user;
+
+    const onlyDoctor  = role === 'doctor'  ? doctor_id  : null;
+    const onlyPatient = role === 'patient' ? patient_id : null;
 
     const result = await db.query(
       `SELECT a.appt_id, a.appt_date, a.time_slot, a.status,
@@ -17,8 +21,10 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), asy
        JOIN department dep  ON d.dept_id    = dep.dept_id
        WHERE ($1::date IS NULL OR a.appt_date = $1)
          AND ($2::text IS NULL OR a.status    = $2)
+         AND ($3::int  IS NULL OR a.doctor_id  = $3)
+         AND ($4::int  IS NULL OR a.patient_id = $4)
        ORDER BY a.appt_date DESC, a.time_slot`,
-      [date || null, status || null]
+      [date || null, status || null, onlyDoctor, onlyPatient]
     );
     res.json(result.rows);
   } catch (err) { next(err); }
@@ -131,6 +137,19 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
 router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { status } = req.body;
+    const { role, doctor_id } = req.user;
+
+    if (role === 'doctor') {
+      const own = await db.query(
+        `SELECT 1 FROM appointment WHERE appt_id = $1 AND doctor_id = $2`,
+        [req.params.id, doctor_id]
+      );
+      if (own.rows.length === 0) {
+        return res.status(403).json({
+          error: 'You can only update your own appointments'
+        });
+      }
+    }
 
     const result = await db.query(
       `UPDATE appointment SET status = $1 WHERE appt_id = $2 RETURNING *`,
