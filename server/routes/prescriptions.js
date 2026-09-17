@@ -105,9 +105,9 @@ router.post('/', requireAuth, requireRole('admin', 'doctor'), async (req, res, n
       });
     }
 
-    if (appt.rows[0].status === 'Cancelled') {
+    if (appt.rows[0].status === 'Cancelled' || appt.rows[0].status === 'No-Show') {
       return res.status(400).json({
-        error: 'Cannot prescribe against a cancelled appointment'
+        error: `Cannot prescribe against a ${appt.rows[0].status.toLowerCase()} appointment`
       });
     }
 

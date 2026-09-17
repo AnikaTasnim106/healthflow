@@ -71,6 +71,16 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
       return res.status(400).json({ error: 'A patient and a room are required' });
     }
 
+    if (admit_date) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const wanted = new Date(admit_date); wanted.setHours(0, 0, 0, 0);
+      if (wanted > today) {
+        return res.status(400).json({
+          error: 'A patient cannot be admitted for a future date'
+        });
+      }
+    }
+
     const admission = await db.withTransaction(async (client) => {
       const roomCheck = await client.query(
         `SELECT status FROM room WHERE room_no = $1 FOR UPDATE`,
@@ -117,6 +127,16 @@ router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist')
   try {
     const { id } = req.params;
     const { discharge_date } = req.body;
+
+    if (discharge_date) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const wanted = new Date(discharge_date); wanted.setHours(0, 0, 0, 0);
+      if (wanted > today) {
+        return res.status(400).json({
+          error: 'A discharge cannot be dated in the future'
+        });
+      }
+    }
 
     const updated = await db.withTransaction(async (client) => {
       const current = await client.query(

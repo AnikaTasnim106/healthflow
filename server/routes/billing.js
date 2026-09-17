@@ -61,6 +61,32 @@ router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptioni
   try {
     const admissionId = req.params.id;
 
+    const existing = await db.query(
+      `SELECT bill_id FROM bill WHERE admission_id = $1`,
+      [admissionId]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({
+        error: `This admission already has bill B-${String(existing.rows[0].bill_id).padStart(3, '0')}`
+      });
+    }
+
+    const adm = await db.query(
+      `SELECT discharge_date FROM admission WHERE admission_id = $1`,
+      [admissionId]
+    );
+
+    if (adm.rows.length === 0) {
+      return res.status(404).json({ error: 'Admission not found' });
+    }
+
+    if (adm.rows[0].discharge_date === null) {
+      return res.status(409).json({
+        error: 'Discharge the patient before generating the bill'
+      });
+    }
+
     await db.query(`CALL sp_generate_admission_bill($1)`, [admissionId]);
 
     const bill = await db.query(

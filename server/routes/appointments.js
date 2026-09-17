@@ -113,15 +113,81 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
       });
     }
 
-    const result = await db.query(
-      `INSERT INTO appointment
-         (patient_id, doctor_id, schedule_id, appt_date, time_slot)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [patient_id, doctor_id, schedule_id || null, appt_date, time_slot]
-    );
-    res.status(201).json(result.rows[0]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const wanted = new Date(appt_date);
+    wanted.setHours(0, 0, 0, 0);
+
+    if (wanted < today) {
+      return res.status(400).json({
+        error: 'An appointment cannot be booked for a date in the past'
+      });
+    }
+
+    const booked = await db.withTransaction(async (client) => {
+      if (schedule_id) {
+        const sched = await client.query(
+          `SELECT ds.schedule_id, ds.doctor_id, ds.day_of_week,
+                  ds.start_time, ds.end_time, ds.max_patients, ds.is_active,
+                  TRIM(TO_CHAR($2::date, 'Day')) AS booking_day
+           FROM doctor_schedule ds
+           WHERE ds.schedule_id = $1
+           FOR UPDATE`,
+          [schedule_id, appt_date]
+        );
+
+        if (sched.rows.length === 0) {
+          throw { status: 404, message: 'That chamber slot does not exist' };
+        }
+
+        const sc = sched.rows[0];
+
+        if (Number(sc.doctor_id) !== Number(doctor_id)) {
+          throw { status: 400, message: 'That chamber slot belongs to a different doctor' };
+        }
+        if (!sc.is_active) {
+          throw { status: 409, message: 'That chamber slot is not active' };
+        }
+        if (sc.day_of_week !== sc.booking_day) {
+          throw {
+            status: 400,
+            message: `This doctor sits on ${sc.day_of_week}, but that date is a ${sc.booking_day}`
+          };
+        }
+        if (time_slot < sc.start_time || time_slot >= sc.end_time) {
+          throw {
+            status: 400,
+            message: `Chamber hours are ${sc.start_time} to ${sc.end_time}`
+          };
+        }
+
+        const taken = await client.query(
+          `SELECT COUNT(*) AS n FROM appointment
+           WHERE schedule_id = $1 AND appt_date = $2 AND status <> 'Cancelled'`,
+          [schedule_id, appt_date]
+        );
+
+        if (Number(taken.rows[0].n) >= Number(sc.max_patients)) {
+          throw {
+            status: 409,
+            message: `This chamber is full for that day — ${sc.max_patients} patients already booked`
+          };
+        }
+      }
+
+      const result = await client.query(
+        `INSERT INTO appointment
+           (patient_id, doctor_id, schedule_id, appt_date, time_slot)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [patient_id, doctor_id, schedule_id || null, appt_date, time_slot]
+      );
+      return result.rows[0];
+    });
+
+    res.status(201).json(booked);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     if (err.code === '23505') {
       return res.status(409).json({
         error: 'This doctor is already booked for that time slot'

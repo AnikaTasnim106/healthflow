@@ -62,6 +62,16 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), as
       return res.status(400).json({ error: 'A patient and a test are required' });
     }
 
+    if (test_date) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const wanted = new Date(test_date); wanted.setHours(0, 0, 0, 0);
+      if (wanted > today) {
+        return res.status(400).json({
+          error: 'A test cannot be dated in the future'
+        });
+      }
+    }
+
     const suggestedBy = role === 'doctor'
       ? doctor_id
       : (req.body.doctor_id || null);
