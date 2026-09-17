@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../auth';
 import {
-  getPatients, getAppointments, getMedicines,
+  getPatients, getAppointments, getMedicines, createMedicine,
   getPatientPrescriptions, getPrescription, createPrescription,
 } from '../api';
 
@@ -12,6 +13,9 @@ const prettyDate = (d) => {
 };
 
 export default function Prescriptions() {
+  const { user } = useAuth();
+  const canWrite = user.role === 'doctor' || user.role === 'admin';
+
   const [patients, setPatients]   = useState([]);
   const [medicines, setMedicines] = useState([]);
 
@@ -28,23 +32,28 @@ export default function Prescriptions() {
   const [notice, setNotice]   = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  const emptyForm = {
-    appt_id: '', diagnosis: '',
-    medicines: [{ med_id: '', dosage: '', frequency: '', duration: '' }],
-  };
+  const emptyRow = { med_id: '', typed: '', newPrice: '', dosage: '', frequency: '', duration: '' };
+  const emptyForm = { appt_id: '', diagnosis: '', medicines: [{ ...emptyRow }] };
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     getPatients('').then((r) => setPatients(r.data)).catch(() => {});
-    getMedicines()
-      .then((r) => setMedicines(r.data))
-      .catch(() => console.warn('Medicines endpoint not available yet'));
+    loadMedicines();
   }, []);
 
   useEffect(() => {
     if (!patientId) { setList([]); setAppts([]); return; }
     loadForPatient();
   }, [patientId]);
+
+  async function loadMedicines() {
+    try {
+      const r = await getMedicines('');
+      setMedicines(r.data);
+    } catch {
+      console.warn('Medicines endpoint not available');
+    }
+  }
 
   async function loadForPatient() {
     try {
@@ -58,12 +67,9 @@ export default function Prescriptions() {
         getAppointments({}),
       ]);
       setList(pr.data);
-      setAppts(ap.data.filter(
-        (a) => String(a.patient_id) === String(patientId)
-      ));
+      setAppts(ap.data.filter((a) => String(a.patient_id) === String(patientId)));
     } catch (err) {
       setError('Could not load prescriptions for this patient.');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -78,30 +84,63 @@ export default function Prescriptions() {
       const res = await getPrescription(id);
       setDetail(res.data);
     } catch (err) {
-      setError('Could not load this prescription.');
+      setError(err.response?.data?.error || 'Could not load this prescription.');
     } finally {
       setDetailLoading(false);
     }
   }
 
-  const addMedRow = () => setForm({
-    ...form,
-    medicines: [...form.medicines, { med_id: '', dosage: '', frequency: '', duration: '' }],
-  });
+  const addMedRow = () =>
+    setForm({ ...form, medicines: [...form.medicines, { ...emptyRow }] });
 
-  const removeMedRow = (i) => setForm({
-    ...form,
-    medicines: form.medicines.filter((_, idx) => idx !== i),
-  });
+  const removeMedRow = (i) =>
+    setForm({ ...form, medicines: form.medicines.filter((_, idx) => idx !== i) });
 
-  const setMed = (i, key, value) => {
+  const setMed = (i, patch) => {
     const meds = [...form.medicines];
-    meds[i] = { ...meds[i], [key]: value };
+    meds[i] = { ...meds[i], ...patch };
     setForm({ ...form, medicines: meds });
   };
 
+  function onTypeMedicine(i, value) {
+    const match = medicines.find(
+      (m) => m.name.toLowerCase() === value.trim().toLowerCase()
+    );
+    setMed(i, { typed: value, med_id: match ? String(match.med_id) : '' });
+  }
+
+  async function addToCatalog(i) {
+    const row = form.medicines[i];
+    const name = row.typed.trim();
+    if (!name) { setError('Type a medicine name first.'); return; }
+
+    try {
+      setError('');
+      const res = await createMedicine({
+        name,
+        unit_price: row.newPrice || 0,
+        stock_qty: 0,
+      });
+      const created = res.data;
+      setMedicines([...medicines, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setMed(i, { med_id: String(created.med_id), typed: created.name, newPrice: '' });
+      setNotice(`${created.name} added to the catalog. The pharmacy still has to stock it.`);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not add this medicine to the catalog.');
+    }
+  }
+
   async function handleCreate() {
-    if (!form.appt_id) { setError('Choose the appointment this prescription belongs to.'); return; }
+    if (!form.appt_id) {
+      setError('Choose the appointment this prescription belongs to.');
+      return;
+    }
+
+    const unknown = form.medicines.find((m) => m.typed.trim() && !m.med_id);
+    if (unknown) {
+      setError(`"${unknown.typed.trim()}" is not in the catalog yet — add it first.`);
+      return;
+    }
 
     const meds = form.medicines
       .filter((m) => m.med_id && m.dosage.trim() && m.frequency.trim() && m.duration.trim())
@@ -138,9 +177,7 @@ export default function Prescriptions() {
       <div className="page-top">
         <h2>Prescriptions</h2>
         <span className="count">
-          {patientId
-            ? (loading ? '\u2014' : `${list.length} on record`)
-            : 'Select a patient'}
+          {patientId ? (loading ? '\u2014' : `${list.length} on record`) : 'Select a patient'}
         </span>
       </div>
 
@@ -152,12 +189,13 @@ export default function Prescriptions() {
             <option key={p.patient_id} value={p.patient_id}>{p.name}</option>
           ))}
         </select>
-        <button className="btn primary"
-          onClick={() => setShowForm(!showForm)}
-          disabled={!patientId || medicines.length === 0}
-          title={medicines.length === 0 ? 'Medicines endpoint not available yet' : ''}>
-          {showForm ? 'Close' : 'Write prescription'}
-        </button>
+        {canWrite && (
+          <button className="btn primary"
+            onClick={() => setShowForm(!showForm)}
+            disabled={!patientId}>
+            {showForm ? 'Close' : 'Write prescription'}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -197,7 +235,8 @@ export default function Prescriptions() {
 
             <label style={{ gridColumn: 'span 2' }}>
               Diagnosis
-              <input value={form.diagnosis} placeholder="e.g. Hypertension with mild LV hypertrophy"
+              <input value={form.diagnosis}
+                placeholder="Hypertension with mild LV hypertrophy"
                 onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} />
             </label>
           </div>
@@ -206,29 +245,57 @@ export default function Prescriptions() {
             Medicines &mdash; dosage, frequency and duration
           </div>
 
-          {form.medicines.map((m, i) => (
-            <div key={i} className="med-row">
-              <span className="item-no">{i + 1}</span>
-              <select value={m.med_id}
-                onChange={(e) => setMed(i, 'med_id', e.target.value)}>
-                <option value="">Choose a medicine</option>
-                {medicines.map((med) => (
-                  <option key={med.med_id} value={med.med_id}>{med.name}</option>
-                ))}
-              </select>
-              <input placeholder="Dosage (500mg)" value={m.dosage}
-                onChange={(e) => setMed(i, 'dosage', e.target.value)} />
-              <input placeholder="Frequency (1+0+1)" value={m.frequency}
-                onChange={(e) => setMed(i, 'frequency', e.target.value)} />
-              <input placeholder="Duration (7 days)" value={m.duration}
-                onChange={(e) => setMed(i, 'duration', e.target.value)} />
-              <button className="btn ghost sm"
-                disabled={form.medicines.length === 1}
-                onClick={() => removeMedRow(i)}>
-                Remove
-              </button>
-            </div>
-          ))}
+          <datalist id="medicine-options">
+            {medicines.map((m) => (
+              <option key={m.med_id} value={m.name} />
+            ))}
+          </datalist>
+
+          {form.medicines.map((m, i) => {
+            const typed = m.typed.trim();
+            const isNew = typed && !m.med_id;
+
+            return (
+              <div key={i}>
+                <div className="med-row">
+                  <span className="item-no">{i + 1}</span>
+                  <input
+                    list="medicine-options"
+                    placeholder="Type or pick a medicine"
+                    value={m.typed}
+                    onChange={(e) => onTypeMedicine(i, e.target.value)}
+                  />
+                  <input placeholder="Dosage (500mg)" value={m.dosage}
+                    onChange={(e) => setMed(i, { dosage: e.target.value })} />
+                  <input placeholder="Frequency (1+0+1)" value={m.frequency}
+                    onChange={(e) => setMed(i, { frequency: e.target.value })} />
+                  <input placeholder="Duration (7 days)" value={m.duration}
+                    onChange={(e) => setMed(i, { duration: e.target.value })} />
+                  <button className="btn ghost sm"
+                    disabled={form.medicines.length === 1}
+                    onClick={() => removeMedRow(i)}>
+                    Remove
+                  </button>
+                </div>
+
+                {isNew && (
+                  <div className="pay-form" style={{ margin: '0 0 12px 34px' }}>
+                    <span className="sub" style={{ alignSelf: 'center' }}>
+                      &ldquo;{typed}&rdquo; is not in the catalog
+                    </span>
+                    <input type="number" min="0" step="0.01"
+                      placeholder="Unit price"
+                      style={{ maxWidth: 130 }}
+                      value={m.newPrice}
+                      onChange={(e) => setMed(i, { newPrice: e.target.value })} />
+                    <button className="btn sm" onClick={() => addToCatalog(i)}>
+                      Add to catalog
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <div className="item-foot">
             <button className="btn sm" onClick={addMedRow}>+ Add medicine</button>
@@ -236,6 +303,12 @@ export default function Prescriptions() {
               {form.medicines.length} medicine{form.medicines.length === 1 ? '' : 's'}
             </span>
           </div>
+
+          <p className="gate-note">
+            A medicine that is not in the catalog can be added right here. It
+            starts with zero stock, so the patient buys it outside until the
+            pharmacy stocks it.
+          </p>
 
           <div className="form-actions">
             <button className="btn"
@@ -277,9 +350,7 @@ export default function Prescriptions() {
               {list.map((pr) => (
                 <tr key={pr.presc_id}
                     style={openId === pr.presc_id ? { background: '#f2f6f7' } : undefined}>
-                  <td>
-                    <span className="id">RX-{String(pr.presc_id).padStart(3, '0')}</span>
-                  </td>
+                  <td><span className="id">RX-{String(pr.presc_id).padStart(3, '0')}</span></td>
                   <td><span className="data">{prettyDate(pr.presc_date)}</span></td>
                   <td><span className="name">{pr.doctor_name}</span></td>
                   <td>{pr.diagnosis || <span className="sub">Not recorded</span>}</td>

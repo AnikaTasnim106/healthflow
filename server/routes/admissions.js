@@ -1,13 +1,13 @@
-
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-
-router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
+router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor', 'patient'), async (req, res, next) => {
   try {
+    const { role, patient_id } = req.user;
+    const onlyMine = role === 'patient' ? patient_id : null;
+
     const result = await db.query(
       `SELECT ad.admission_id, ad.admit_date, ad.discharge_date,
               p.patient_id, p.name AS patient_name,
@@ -15,11 +15,14 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), asy
        FROM admission ad
        JOIN patient p ON ad.patient_id = p.patient_id
        JOIN room r    ON ad.room_no    = r.room_no
-       ORDER BY ad.admit_date DESC`
+       WHERE ($1::int IS NULL OR ad.patient_id = $1)
+       ORDER BY ad.admit_date DESC`,
+      [onlyMine]
     );
     res.json(result.rows);
   } catch (err) { next(err); }
 });
+
 
 router.get('/available-rooms', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
@@ -32,6 +35,7 @@ router.get('/available-rooms', requireAuth, requireRole('admin', 'receptionist')
     res.json(result.rows);
   } catch (err) { next(err); }
 });
+
 
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
@@ -58,17 +62,18 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
 router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, room_no, admit_date } = req.body;
 
     if (!patient_id || !room_no) {
-      return res.status(400).json({ error: 'patient_id and room_no required' });
+      return res.status(400).json({ error: 'A patient and a room are required' });
     }
 
     const admission = await db.withTransaction(async (client) => {
       const roomCheck = await client.query(
-        `SELECT status FROM room WHERE room_no = $1`,
+        `SELECT status FROM room WHERE room_no = $1 FOR UPDATE`,
         [room_no]
       );
 
@@ -76,7 +81,7 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
         throw { status: 404, message: 'Room not found' };
       }
       if (roomCheck.rows[0].status !== 'Available') {
-        throw { status: 409, message: 'Room is not available' };
+        throw { status: 409, message: 'That room is not available' };
       }
 
       const result = await client.query(
@@ -97,9 +102,16 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
     res.status(201).json(admission);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'That room already has an active admission' });
+    }
+    if (err.code === '23503') {
+      return res.status(400).json({ error: 'Patient or room does not exist' });
+    }
     next(err);
   }
 });
+
 
 router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
@@ -107,6 +119,20 @@ router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist')
     const { discharge_date } = req.body;
 
     const updated = await db.withTransaction(async (client) => {
+      const current = await client.query(
+        `SELECT admission_id, room_no, admit_date, discharge_date
+         FROM admission WHERE admission_id = $1 FOR UPDATE`,
+        [id]
+      );
+
+      if (current.rows.length === 0) {
+        throw { status: 404, message: 'Admission not found' };
+      }
+
+      if (current.rows[0].discharge_date !== null) {
+        throw { status: 409, message: 'This patient has already been discharged' };
+      }
+
       const result = await client.query(
         `UPDATE admission
          SET discharge_date = COALESCE($1, CURRENT_DATE)
@@ -115,16 +141,21 @@ router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist')
         [discharge_date || null, id]
       );
 
-      if (result.rows.length === 0) {
-        throw { status: 404, message: 'Admission not found' };
-      }
-
       const roomNo = result.rows[0].room_no;
 
-      await client.query(
-        `UPDATE room SET status = 'Available' WHERE room_no = $1`,
+      const stillOccupied = await client.query(
+        `SELECT 1 FROM admission
+         WHERE room_no = $1 AND discharge_date IS NULL
+         LIMIT 1`,
         [roomNo]
       );
+
+      if (stillOccupied.rows.length === 0) {
+        await client.query(
+          `UPDATE room SET status = 'Available' WHERE room_no = $1`,
+          [roomNo]
+        );
+      }
 
       return result.rows[0];
     });
@@ -132,8 +163,12 @@ router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist')
     res.json(updated);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.code === '23514') {
+      return res.status(400).json({ error: 'Discharge date cannot be before the admit date' });
+    }
     next(err);
   }
 });
+
 
 module.exports = router;
