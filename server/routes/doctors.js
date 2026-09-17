@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -7,8 +5,6 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const nz = (v) => (v === '' || v === undefined ? null : v);
-
-
 function requireOwnSchedule(req, res, next) {
   const { role, doctor_id } = req.user;
 
@@ -21,7 +17,6 @@ function requireOwnSchedule(req, res, next) {
 
   return res.status(403).json({ error: 'Only a doctor or an administrator can change a schedule' });
 }
-
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
@@ -34,8 +29,6 @@ router.get('/', requireAuth, async (req, res, next) => {
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
-
 router.get('/:id/schedule', requireAuth, async (req, res, next) => {
   try {
     const includeInactive = req.query.all === 'true';
@@ -58,8 +51,6 @@ router.get('/:id/schedule', requireAuth, async (req, res, next) => {
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
-
 router.post('/:id/schedule', requireAuth, requireOwnSchedule, async (req, res, next) => {
   try {
     const { day_of_week, start_time, end_time, chamber_no,
@@ -71,20 +62,65 @@ router.post('/:id/schedule', requireAuth, requireOwnSchedule, async (req, res, n
       });
     }
 
-    const result = await db.query(
-      `INSERT INTO doctor_schedule
-         (doctor_id, day_of_week, start_time, end_time,
-          chamber_no, slot_duration, max_patients)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [
-        req.params.id, day_of_week, start_time, end_time,
-        nz(chamber_no),
-        slot_duration || 15,
-        max_patients || 20,
-      ]
-    );
-    res.status(201).json(result.rows[0]);
+    if (end_time <= start_time) {
+      return res.status(400).json({ error: 'End time must be after start time' });
+    }
+
+    const duration = Number(slot_duration) || 15;
+    const cap = Number(max_patients) || 20;
+
+    const created = await db.withTransaction(async (client) => {
+      const clash = await client.query(
+        `SELECT day_of_week, start_time, end_time
+         FROM doctor_schedule
+         WHERE doctor_id = $1
+           AND day_of_week = $2
+           AND is_active = TRUE
+           AND ($3::time, $4::time) OVERLAPS (start_time, end_time)
+         LIMIT 1`,
+        [req.params.id, day_of_week, start_time, end_time]
+      );
+
+      if (clash.rows.length > 0) {
+        const c = clash.rows[0];
+        throw {
+          status: 409,
+          message: `This overlaps an existing ${c.day_of_week} slot, ${c.start_time} to ${c.end_time}`
+        };
+      }
+
+      const fits = await client.query(
+        `SELECT FLOOR(EXTRACT(EPOCH FROM ($2::time - $1::time)) / 60 / $3) AS slots`,
+        [start_time, end_time, duration]
+      );
+      const slotCount = Number(fits.rows[0].slots);
+
+      if (slotCount < 1) {
+        throw {
+          status: 400,
+          message: `The window is shorter than one ${duration} minute slot`
+        };
+      }
+
+      if (cap > slotCount) {
+        throw {
+          status: 400,
+          message: `Only ${slotCount} slots of ${duration} minutes fit in that window`
+        };
+      }
+
+      const result = await client.query(
+        `INSERT INTO doctor_schedule
+           (doctor_id, day_of_week, start_time, end_time,
+            chamber_no, slot_duration, max_patients)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [req.params.id, day_of_week, start_time, end_time, nz(chamber_no), duration, cap]
+      );
+      return result.rows[0];
+    });
+
+    res.status(201).json(created);
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({
@@ -99,18 +135,20 @@ router.post('/:id/schedule', requireAuth, requireOwnSchedule, async (req, res, n
     next(err);
   }
 });
-
-
 router.patch('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, async (req, res, next) => {
   try {
     const { is_active } = req.body;
+
+    if (typeof is_active !== 'boolean') {
+      return res.status(400).json({ error: 'is_active must be true or false' });
+    }
 
     const result = await db.query(
       `UPDATE doctor_schedule
        SET is_active = $1
        WHERE schedule_id = $2 AND doctor_id = $3
        RETURNING *`,
-      [is_active === true, req.params.scheduleId, req.params.id]
+      [is_active, req.params.scheduleId, req.params.id]
     );
 
     if (result.rows.length === 0) {
@@ -119,10 +157,20 @@ router.patch('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, async
     res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
-
-
 router.delete('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, async (req, res, next) => {
   try {
+    const linked = await db.query(
+      `SELECT COUNT(*) AS n FROM appointment
+       WHERE schedule_id = $1 AND status = 'Scheduled'`,
+      [req.params.scheduleId]
+    );
+
+    if (Number(linked.rows[0].n) > 0) {
+      return res.status(409).json({
+        error: `${linked.rows[0].n} upcoming appointment(s) use this slot — turn it off instead of removing it`
+      });
+    }
+
     const result = await db.query(
       `DELETE FROM doctor_schedule
        WHERE schedule_id = $1 AND doctor_id = $2
@@ -136,8 +184,6 @@ router.delete('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, asyn
     res.json({ message: 'Slot removed', schedule_id: result.rows[0].schedule_id });
   } catch (err) { next(err); }
 });
-
-
 router.get('/:id/patients', requireAuth, requireRole('admin', 'receptionist', 'doctor'), async (req, res, next) => {
   try {
     const { role, doctor_id } = req.user;
@@ -156,8 +202,6 @@ router.get('/:id/patients', requireAuth, requireRole('admin', 'receptionist', 'd
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
-
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query(
@@ -176,8 +220,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
     res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
-
-
 router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id,
@@ -241,7 +283,6 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
     next(err);
   }
 });
-
 router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { name, specialization, phone, consult_fee, dept_id } = req.body;
@@ -277,8 +318,6 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => 
     next(err);
   }
 });
-
-
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -299,6 +338,5 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) 
     next(err);
   }
 });
-
 
 module.exports = router;

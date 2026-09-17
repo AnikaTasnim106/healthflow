@@ -205,6 +205,23 @@ router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'd
     const { status } = req.body;
     const { role, doctor_id } = req.user;
 
+    if (!['Scheduled', 'Completed', 'Cancelled', 'No-Show'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value' });
+    }
+
+    const current = await db.query(
+      `SELECT status FROM appointment WHERE appt_id = $1`,
+      [req.params.id]
+    );
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    if (current.rows[0].status === 'Cancelled' && status !== 'Cancelled') {
+      return res.status(409).json({
+        error: 'A cancelled appointment cannot be reopened — book a new one'
+      });
+    }
+
     if (role === 'doctor') {
       const own = await db.query(
         `SELECT 1 FROM appointment WHERE appt_id = $1 AND doctor_id = $2`,
@@ -237,7 +254,7 @@ router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'd
 router.delete('/:id', requireAuth, async (req, res, next) => {
   try {
     const check = await db.query(
-      `SELECT patient_id FROM appointment WHERE appt_id = $1`,
+      `SELECT patient_id, status FROM appointment WHERE appt_id = $1`,
       [req.params.id]
     );
     if (check.rows.length === 0) {
@@ -250,6 +267,11 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
     }
     if (!['admin', 'receptionist', 'patient'].includes(role)) {
       return res.status(403).json({ error: 'Not allowed to cancel appointments' });
+    }
+    if (check.rows[0].status !== 'Scheduled') {
+      return res.status(409).json({
+        error: `This appointment is already marked ${check.rows[0].status.toLowerCase()}`
+      });
     }
 
     const result = await db.query(
