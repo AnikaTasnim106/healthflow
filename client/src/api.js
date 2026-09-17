@@ -133,6 +133,9 @@ export const getDueBills = ()        => api.get('/billing/due');
 export const createBill = (data)     => api.post('/billing', data);
 export const addPayment = (id, data) => api.post(`/billing/${id}/payment`, data);
 export const generateBillFromAdmission = (id) => api.post(`/billing/from-admission/${id}`);
+export const billVisit = (apptId) => api.post(`/billing/from-appointment/${apptId}`);
+export const sellOverCounter = (data) => api.post('/pharmacy/sell', data);
+export const getSalesLog = () => api.get('/pharmacy/sales');
 
 // ---------- ADMISSIONS ----------
 export const getAdmissions    = ()         => api.get('/admissions');

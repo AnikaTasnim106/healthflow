@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../auth';
 import {
   getAppointments, bookAppointment, updateApptStatus,
-  getPatients, getDoctors, getAvailableSlots,
+  getPatients, getDoctors, getAvailableSlots, billVisit,
 } from '../api';
 
 const stampOf = (status) => {
@@ -28,6 +29,9 @@ const prettyDate = (d) => {
 };
 
 export default function Appointments() {
+  const { user } = useAuth();
+  const canBill = user.role === 'admin' || user.role === 'receptionist';
+
   const [appts, setAppts]       = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors]   = useState([]);
@@ -132,6 +136,24 @@ export default function Appointments() {
       loadAppointments();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not book this appointment.');
+    }
+  }
+
+  async function handleBillVisit(a) {
+    if (!window.confirm(
+      `Bill this visit for ${a.patient_name}? The consultation fee and any lab tests from that day will be added.`
+    )) return;
+    try {
+      setError('');
+      const res = await billVisit(a.appt_id);
+      const b = res.data;
+      setNotice(
+        `Visit billed on B-${String(b.bill_id).padStart(3, '0')} for ${b.patient_name} — ` +
+        `${b.items.length} item(s), total \u09F3${Number(b.total_amount).toLocaleString('en-IN')}.`
+      );
+      loadAppointments();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not bill this visit.');
     }
   }
 
@@ -327,6 +349,10 @@ export default function Appointments() {
                           Cancel
                         </button>
                       </>
+                    ) : a.status === 'Completed' && canBill ? (
+                      <button className="btn sm" onClick={() => handleBillVisit(a)}>
+                        Bill visit
+                      </button>
                     ) : (
                       <span className="sub">&mdash;</span>
                     )}

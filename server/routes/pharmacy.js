@@ -86,22 +86,40 @@ router.post('/dispense', requireAuth, requireRole('admin', 'receptionist'), asyn
 
       let billId = null;
       if (charge_to_bill) {
-        const open = await client.query(
-          `SELECT bill_id FROM bill
-           WHERE patient_id = $1 AND pay_status <> 'Paid'
-           ORDER BY issue_date DESC LIMIT 1`,
+        const admitted = await client.query(
+          `SELECT b.bill_id
+           FROM admission a
+           JOIN bill b ON b.admission_id = a.admission_id
+           WHERE a.patient_id = $1
+             AND a.discharge_date IS NULL
+             AND b.pay_status <> 'Paid'
+           ORDER BY a.admit_date DESC
+           LIMIT 1`,
           [patientId]
         );
 
-        if (open.rows.length > 0) {
-          billId = open.rows[0].bill_id;
+        if (admitted.rows.length > 0) {
+          billId = admitted.rows[0].bill_id;
         } else {
-          const nb = await client.query(
-            `INSERT INTO bill (patient_id, total_amount) VALUES ($1, 0)
-             RETURNING bill_id`,
+          const opd = await client.query(
+            `SELECT bill_id FROM bill
+             WHERE patient_id = $1
+               AND admission_id IS NULL
+               AND pay_status = 'Unpaid'
+             ORDER BY issue_date DESC LIMIT 1`,
             [patientId]
           );
-          billId = nb.rows[0].bill_id;
+
+          if (opd.rows.length > 0) {
+            billId = opd.rows[0].bill_id;
+          } else {
+            const nb = await client.query(
+              `INSERT INTO bill (patient_id, total_amount) VALUES ($1, 0)
+               RETURNING bill_id`,
+              [patientId]
+            );
+            billId = nb.rows[0].bill_id;
+          }
         }
       }
 
@@ -135,12 +153,7 @@ router.post('/dispense', requireAuth, requireRole('admin', 'receptionist'), asyn
           };
         }
 
-        const d = await client.query(
-          `INSERT INTO dispense (presc_id, med_id, quantity, unit_price, bill_id)
-           VALUES ($1, $2, $3, $4, $5)
-           RETURNING dispense_id, quantity, unit_price`,
-          [presc_id, line.med_id, qty, m.unit_price, billId]
-        );
+        let itemNo = null;
 
         if (billId) {
           const nextItem = await client.query(
@@ -148,18 +161,26 @@ router.post('/dispense', requireAuth, requireRole('admin', 'receptionist'), asyn
              FROM bill_item WHERE bill_id = $1`,
             [billId]
           );
+          itemNo = nextItem.rows[0].item_no;
 
           await client.query(
             `INSERT INTO bill_item (bill_id, item_no, description, amount)
              VALUES ($1, $2, $3, $4)`,
             [
               billId,
-              nextItem.rows[0].item_no,
-              `Medicine — ${m.name} x ${qty}`,
+              itemNo,
+              `Medicine - ${m.name} x ${qty}`,
               Number(m.unit_price) * qty
             ]
           );
         }
+
+        await client.query(
+          `INSERT INTO dispense
+             (presc_id, med_id, quantity, unit_price, bill_id, bill_item_no)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [presc_id, line.med_id, qty, m.unit_price, billId, itemNo]
+        );
 
         dispensed.push({
           med_id: m.med_id,
@@ -196,11 +217,154 @@ router.post('/dispense', requireAuth, requireRole('admin', 'receptionist'), asyn
 });
 
 
+router.post('/sell', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
+  try {
+    const { patient_id, lines, charge_to_bill } = req.body;
+
+    if (!patient_id) {
+      return res.status(400).json({
+        error: 'Register the buyer as a patient first, then record the sale against them'
+      });
+    }
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ error: 'Add at least one medicine' });
+    }
+
+    const result = await db.withTransaction(async (client) => {
+      const who = await client.query(
+        `SELECT name FROM patient WHERE patient_id = $1`,
+        [patient_id]
+      );
+      if (who.rows.length === 0) {
+        throw { status: 404, message: 'Patient not found' };
+      }
+
+      let billId = null;
+      if (charge_to_bill) {
+        const opd = await client.query(
+          `SELECT bill_id FROM bill
+           WHERE patient_id = $1 AND admission_id IS NULL AND pay_status = 'Unpaid'
+           ORDER BY issue_date DESC LIMIT 1`,
+          [patient_id]
+        );
+
+        if (opd.rows.length > 0) {
+          billId = opd.rows[0].bill_id;
+        } else {
+          const nb = await client.query(
+            `INSERT INTO bill (patient_id, total_amount) VALUES ($1, 0)
+             RETURNING bill_id`,
+            [patient_id]
+          );
+          billId = nb.rows[0].bill_id;
+        }
+      }
+
+      const sold = [];
+
+      for (const line of lines) {
+        const qty = Number(line.quantity);
+        if (!qty || qty <= 0) {
+          throw { status: 400, message: 'Every medicine needs a quantity above zero' };
+        }
+
+        const med = await client.query(
+          `SELECT med_id, name, unit_price, stock_qty
+           FROM medicine WHERE med_id = $1 FOR UPDATE`,
+          [line.med_id]
+        );
+
+        if (med.rows.length === 0) {
+          throw { status: 404, message: 'Medicine not found' };
+        }
+
+        const m = med.rows[0];
+
+        if (Number(m.stock_qty) < qty) {
+          throw {
+            status: 409,
+            message: `Not enough ${m.name} in stock - ${m.stock_qty} left, ${qty} requested`
+          };
+        }
+
+        let itemNo = null;
+
+        if (billId) {
+          const nextItem = await client.query(
+            `SELECT COALESCE(MAX(item_no), 0) + 1 AS item_no
+             FROM bill_item WHERE bill_id = $1`,
+            [billId]
+          );
+          itemNo = nextItem.rows[0].item_no;
+
+          await client.query(
+            `INSERT INTO bill_item (bill_id, item_no, description, amount)
+             VALUES ($1, $2, $3, $4)`,
+            [billId, itemNo, `Medicine - ${m.name} x ${qty}`, Number(m.unit_price) * qty]
+          );
+        }
+
+        await client.query(
+          `INSERT INTO dispense
+             (presc_id, med_id, patient_id, quantity, unit_price, bill_id, bill_item_no)
+           VALUES (NULL, $1, $2, $3, $4, $5, $6)`,
+          [line.med_id, patient_id, qty, m.unit_price, billId, itemNo]
+        );
+
+        sold.push({
+          med_id: m.med_id,
+          name: m.name,
+          quantity: qty,
+          unit_price: Number(m.unit_price),
+          line_total: Number(m.unit_price) * qty
+        });
+      }
+
+      return {
+        patient_id: Number(patient_id),
+        patient_name: who.rows[0].name,
+        bill_id: billId,
+        items: sold,
+        total: sold.reduce((s2, x) => s2 + x.line_total, 0)
+      };
+    });
+
+    res.status(201).json(result);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.code === '23514') {
+      return res.status(409).json({ error: 'That would take stock below zero' });
+    }
+    next(err);
+  }
+});
+
+router.get('/sales', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT ds.dispense_id, ds.quantity, ds.unit_price, ds.dispensed_at,
+              ds.bill_id, m.name AS medicine_name,
+              COALESCE(p1.name, p2.name) AS patient_name,
+              (ds.presc_id IS NULL) AS over_the_counter
+       FROM dispense ds
+       JOIN medicine m ON ds.med_id = m.med_id
+       LEFT JOIN patient p1 ON ds.patient_id = p1.patient_id
+       LEFT JOIN prescription pr ON ds.presc_id = pr.presc_id
+       LEFT JOIN appointment a   ON pr.appt_id  = a.appt_id
+       LEFT JOIN patient p2      ON a.patient_id = p2.patient_id
+       ORDER BY ds.dispensed_at DESC
+       LIMIT 100`
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
 router.delete('/dispense/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const reversed = await db.withTransaction(async (client) => {
       const d = await client.query(
-        `SELECT ds.dispense_id, ds.med_id, ds.quantity, ds.unit_price, ds.bill_id,
+        `SELECT ds.dispense_id, ds.med_id, ds.quantity, ds.unit_price,
+                ds.bill_id, ds.bill_item_no,
                 m.name AS medicine_name
          FROM dispense ds
          JOIN medicine m ON ds.med_id = m.med_id
@@ -228,15 +392,12 @@ router.delete('/dispense/:id', requireAuth, requireRole('admin'), async (req, re
           };
         }
 
-        await client.query(
-          `DELETE FROM bill_item
-           WHERE bill_id = $1 AND description = $2 AND amount = $3`,
-          [
-            row.bill_id,
-            `Medicine — ${row.medicine_name} x ${row.quantity}`,
-            Number(row.unit_price) * Number(row.quantity)
-          ]
-        );
+        if (row.bill_item_no !== null) {
+          await client.query(
+            `DELETE FROM bill_item WHERE bill_id = $1 AND item_no = $2`,
+            [row.bill_id, row.bill_item_no]
+          );
+        }
       }
 
       await client.query(

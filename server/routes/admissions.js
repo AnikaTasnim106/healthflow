@@ -106,7 +106,14 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
         [room_no]
       );
 
-      return result.rows[0];
+      const bill = await client.query(
+        `INSERT INTO bill (patient_id, admission_id, total_amount, pay_status)
+         VALUES ($1, $2, 0, 'Unpaid')
+         RETURNING bill_id`,
+        [patient_id, result.rows[0].admission_id]
+      );
+
+      return { ...result.rows[0], bill_id: bill.rows[0].bill_id };
     });
 
     res.status(201).json(admission);
@@ -172,12 +179,24 @@ router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist')
 
       if (stillOccupied.rows.length === 0) {
         await client.query(
-          `UPDATE room SET status = 'Available' WHERE room_no = $1`,
+          `UPDATE room SET status = 'Available' WHERE room_no = $1
+             AND status = 'Occupied'`,
           [roomNo]
         );
       }
 
-      return result.rows[0];
+      await client.query(`CALL sp_generate_admission_bill($1)`, [id]);
+
+      const bill = await client.query(
+        `SELECT bill_id, total_amount FROM bill WHERE admission_id = $1`,
+        [id]
+      );
+
+      return {
+        ...result.rows[0],
+        bill_id: bill.rows[0] ? bill.rows[0].bill_id : null,
+        total_amount: bill.rows[0] ? bill.rows[0].total_amount : null
+      };
     });
 
     res.json(updated);
@@ -185,6 +204,9 @@ router.patch('/:id/discharge', requireAuth, requireRole('admin', 'receptionist')
     if (err.status) return res.status(err.status).json({ error: err.message });
     if (err.code === '23514') {
       return res.status(400).json({ error: 'Discharge date cannot be before the admit date' });
+    }
+    if (err.message && err.message.includes('already been billed')) {
+      return res.status(409).json({ error: 'This stay has already been billed' });
     }
     next(err);
   }

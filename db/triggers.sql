@@ -106,13 +106,6 @@ DECLARE
     test_rec         RECORD;
     fee_rec          RECORD;
 BEGIN
-    SELECT bill_id INTO v_existing
-    FROM bill WHERE admission_id = p_admission_id;
-
-    IF FOUND THEN
-        RAISE EXCEPTION 'Admission % already has bill %', p_admission_id, v_existing;
-    END IF;
-
     SELECT a.patient_id, a.room_no, a.admit_date, a.discharge_date, r.daily_charge
     INTO v_patient_id, v_room_no, v_admit_date, v_discharge_date, v_daily_charge
     FROM admission a
@@ -123,12 +116,29 @@ BEGIN
         RAISE EXCEPTION 'Admission % not found', p_admission_id;
     END IF;
 
+    SELECT bill_id INTO v_bill_id
+    FROM bill WHERE admission_id = p_admission_id;
+
+    IF NOT FOUND THEN
+        INSERT INTO bill (patient_id, admission_id, total_amount, pay_status)
+        VALUES (v_patient_id, p_admission_id, 0, 'Unpaid')
+        RETURNING bill_id INTO v_bill_id;
+    END IF;
+
+    SELECT COUNT(*) INTO v_existing
+    FROM bill_item
+    WHERE bill_id = v_bill_id AND description LIKE 'Room charge%';
+
+    IF v_existing > 0 THEN
+        RAISE EXCEPTION 'Admission % has already been billed on bill %',
+            p_admission_id, v_bill_id;
+    END IF;
+
+    SELECT COALESCE(MAX(item_no), 0) + 1 INTO v_item_no
+    FROM bill_item WHERE bill_id = v_bill_id;
+
     v_days := GREATEST(COALESCE(v_discharge_date, CURRENT_DATE) - v_admit_date, 1);
     v_room_charge := v_days * v_daily_charge;
-
-    INSERT INTO bill (patient_id, admission_id, total_amount, pay_status)
-    VALUES (v_patient_id, p_admission_id, 0, 'Unpaid')
-    RETURNING bill_id INTO v_bill_id;
 
     INSERT INTO bill_item (bill_id, item_no, description, amount)
     VALUES (v_bill_id, v_item_no,

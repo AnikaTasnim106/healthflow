@@ -57,18 +57,57 @@ router.get('/revenue', requireAuth, requireRole('admin', 'receptionist'), async 
     res.json(result.rows);
   } catch (err) { next(err); }
 });
+router.post('/from-appointment/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
+  try {
+    const apptId = req.params.id;
+
+    await db.query(`CALL sp_generate_opd_bill($1)`, [apptId]);
+
+    const bill = await db.query(
+      `SELECT b.bill_id, b.total_amount, b.pay_status, p.name AS patient_name
+       FROM appointment a
+       JOIN bill b ON b.patient_id = a.patient_id AND b.admission_id IS NULL
+       JOIN patient p ON b.patient_id = p.patient_id
+       WHERE a.appt_id = $1
+       ORDER BY b.bill_id DESC
+       LIMIT 1`,
+      [apptId]
+    );
+
+    const items = bill.rows[0]
+      ? await db.query(
+          `SELECT item_no, description, amount FROM bill_item
+           WHERE bill_id = $1 ORDER BY item_no`,
+          [bill.rows[0].bill_id]
+        )
+      : { rows: [] };
+
+    res.status(201).json({ ...bill.rows[0], items: items.rows });
+  } catch (err) {
+    const m = err.message || '';
+    if (m.includes('not found'))            return res.status(404).json({ error: m });
+    if (m.includes('already been billed'))  return res.status(409).json({ error: 'This visit has already been billed' });
+    if (m.includes('inside an admission'))  return res.status(409).json({ error: 'This visit is billed with the admission' });
+    if (m.includes('only a completed'))     return res.status(409).json({ error: 'Only a completed visit can be billed' });
+    next(err);
+  }
+});
+
 router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const admissionId = req.params.id;
 
-    const existing = await db.query(
-      `SELECT bill_id FROM bill WHERE admission_id = $1`,
+    const finalised = await db.query(
+      `SELECT b.bill_id FROM bill b
+       JOIN bill_item bi ON bi.bill_id = b.bill_id
+       WHERE b.admission_id = $1 AND bi.description LIKE 'Room charge%'
+       LIMIT 1`,
       [admissionId]
     );
 
-    if (existing.rows.length > 0) {
+    if (finalised.rows.length > 0) {
       return res.status(409).json({
-        error: `This admission already has bill B-${String(existing.rows[0].bill_id).padStart(3, '0')}`
+        error: `This stay is already billed on B-${String(finalised.rows[0].bill_id).padStart(3, '0')}`
       });
     }
 
