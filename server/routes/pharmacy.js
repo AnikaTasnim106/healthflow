@@ -198,16 +198,66 @@ router.post('/dispense', requireAuth, requireRole('admin', 'receptionist'), asyn
 
 router.delete('/dispense/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
-    const result = await db.query(
-      `DELETE FROM dispense WHERE dispense_id = $1 RETURNING dispense_id, med_id, quantity`,
-      [req.params.id]
-    );
+    const reversed = await db.withTransaction(async (client) => {
+      const d = await client.query(
+        `SELECT ds.dispense_id, ds.med_id, ds.quantity, ds.unit_price, ds.bill_id,
+                m.name AS medicine_name
+         FROM dispense ds
+         JOIN medicine m ON ds.med_id = m.med_id
+         WHERE ds.dispense_id = $1
+         FOR UPDATE OF ds`,
+        [req.params.id]
+      );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Dispense record not found' });
-    }
-    res.json({ message: 'Dispense reversed, stock restored', ...result.rows[0] });
-  } catch (err) { next(err); }
+      if (d.rows.length === 0) {
+        throw { status: 404, message: 'Dispense record not found' };
+      }
+
+      const row = d.rows[0];
+
+      if (row.bill_id) {
+        const bill = await client.query(
+          `SELECT pay_status FROM bill WHERE bill_id = $1 FOR UPDATE`,
+          [row.bill_id]
+        );
+
+        if (bill.rows.length > 0 && bill.rows[0].pay_status !== 'Unpaid') {
+          throw {
+            status: 409,
+            message: `Bill B-${String(row.bill_id).padStart(3, '0')} has already been paid against — refund it at the counter instead of reversing`
+          };
+        }
+
+        await client.query(
+          `DELETE FROM bill_item
+           WHERE bill_id = $1 AND description = $2 AND amount = $3`,
+          [
+            row.bill_id,
+            `Medicine — ${row.medicine_name} x ${row.quantity}`,
+            Number(row.unit_price) * Number(row.quantity)
+          ]
+        );
+      }
+
+      await client.query(
+        `DELETE FROM dispense WHERE dispense_id = $1`,
+        [req.params.id]
+      );
+
+      return row;
+    });
+
+    res.json({
+      message: 'Dispense reversed, stock restored and the charge removed',
+      dispense_id: reversed.dispense_id,
+      medicine: reversed.medicine_name,
+      quantity: reversed.quantity,
+      bill_id: reversed.bill_id
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
 });
 
 
