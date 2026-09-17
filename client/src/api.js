@@ -91,7 +91,17 @@ export const deletePatient = (id)          => api.delete(`/patients/${id}`);
 export const updateContact = (id, data)    => api.patch(`/patients/${id}/contact`, data);
 
 // ---------- DEPARTMENTS ----------
-export const getDepartments = () => api.get('/departments');
+export const getDepartments   = () => api.get('/departments');
+export const createDepartment = (data) => api.post('/departments', data);
+export const updateDepartment = (id, data) => api.put(`/departments/${id}`, data);
+export const deleteDepartment = (id) => api.delete(`/departments/${id}`);
+
+export const getRooms      = (params = {}) => api.get('/rooms', { params });
+export const getRoomSummary = () => api.get('/rooms/summary');
+export const createRoom    = (data) => api.post('/rooms', data);
+export const updateRoom    = (roomNo, data) => api.put(`/rooms/${roomNo}`, data);
+export const setRoomStatus = (roomNo, status) => api.patch(`/rooms/${roomNo}/status`, { status });
+export const deleteRoom    = (roomNo) => api.delete(`/rooms/${roomNo}`);
 
 // ---------- DOCTORS ----------
 export const getDoctors        = ()   => api.get('/doctors');

@@ -34,7 +34,7 @@ app.use('/api/pharmacy', require('./routes/pharmacy'));
 app.get('/', (req, res) => {
   res.json({ message: 'HealthFlow API is running 🏥' });
 });
-
+app.use('/api/rooms', require('./routes/rooms'));
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });

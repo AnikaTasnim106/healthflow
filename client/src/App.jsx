@@ -19,6 +19,8 @@ import Doctors from './pages/Doctors';
 import Schedule from './pages/Schedule';
 import Appointments from './pages/Appointments';
 import Admissions from './pages/Admissions';
+import Rooms from './pages/Rooms';
+import Departments from './pages/Departments';
 import Prescriptions from './pages/Prescriptions';
 import LabTests from './pages/LabTests';
 import Medicines from './pages/Medicines';
@@ -35,6 +37,8 @@ const PAGES = {
   schedule:      { label: 'Schedule',      component: Schedule },
   appointments:  { label: 'Appointments',  component: Appointments },
   admissions:    { label: 'Admissions',    component: Admissions },
+  rooms:         { label: 'Rooms',         component: Rooms },
+  departments:   { label: 'Departments',   component: Departments },
   prescriptions: { label: 'Prescriptions', component: Prescriptions },
   labtests:      { label: 'Lab Tests',     component: LabTests },
   medicines:     { label: 'Medicines',     component: Medicines },
