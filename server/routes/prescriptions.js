@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
+const { requireAuth, requireRole, requirePatientAccess } = require('../middleware/auth');
 
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
@@ -58,7 +58,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 });
 
 
-router.get('/patient/:patientId', requireAuth, requireOwnPatientRecord('patientId'), async (req, res, next) => {
+router.get('/patient/:patientId', requireAuth, requirePatientAccess('patientId'), async (req, res, next) => {
   try {
     const { role, doctor_id } = req.user;
     const onlyMine = role === 'doctor' ? doctor_id : null;

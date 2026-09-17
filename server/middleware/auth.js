@@ -1,5 +1,3 @@
-
-
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 
@@ -49,6 +47,7 @@ async function requireAuth(req, res, next) {
     next(err);
   }
 }
+
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {
@@ -61,32 +60,74 @@ function requireRole(...allowedRoles) {
   };
 }
 
+function requirePatientAccess(paramName = 'id') {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Login required' });
+      }
 
-function requireOwnPatientRecord(paramName = 'id') {
+      const { role, patient_id, doctor_id } = req.user;
+      const requestedId = parseInt(req.params[paramName], 10);
+
+      if (Number.isNaN(requestedId)) {
+        return res.status(400).json({ error: 'Invalid patient id' });
+      }
+
+      if (role === 'admin' || role === 'receptionist') {
+        return next();
+      }
+
+      if (role === 'patient') {
+        if (patient_id === requestedId) return next();
+        return res.status(403).json({ error: 'You can only access your own data' });
+      }
+
+      if (role === 'doctor') {
+        const seen = await db.query(
+          `SELECT 1 FROM appointment
+           WHERE patient_id = $1 AND doctor_id = $2
+           LIMIT 1`,
+          [requestedId, doctor_id]
+        );
+        if (seen.rows.length > 0) return next();
+        return res.status(403).json({
+          error: 'You can only access patients who have an appointment with you'
+        });
+      }
+
+      return res.status(403).json({ error: 'Not allowed' });
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+function requireOwnDoctorRecord(paramName = 'id') {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Login required' });
     }
 
-    const { role, patient_id } = req.user;
+    const { role, doctor_id } = req.user;
 
-    if (role === 'admin' || role === 'receptionist' || role === 'doctor') {
-      return next();
-    }
+    if (role === 'admin') return next();
 
-    if (role === 'patient') {
-      const requestedId = parseInt(req.params[paramName], 10);
-      if (Number.isNaN(requestedId)) {
-        return res.status(400).json({ error: 'Invalid id' });
-      }
-      if (patient_id === requestedId) {
-        return next();
-      }
-      return res.status(403).json({ error: 'You can only access your own data' });
+    if (role === 'doctor') {
+      if (doctor_id === parseInt(req.params[paramName], 10)) return next();
+      return res.status(403).json({ error: 'You can only manage your own records' });
     }
 
     return res.status(403).json({ error: 'Not allowed' });
   };
 }
 
-module.exports = { requireAuth, requireRole, requireOwnPatientRecord };
+const requireOwnPatientRecord = requirePatientAccess;
+
+module.exports = {
+  requireAuth,
+  requireRole,
+  requirePatientAccess,
+  requireOwnPatientRecord,
+  requireOwnDoctorRecord,
+};

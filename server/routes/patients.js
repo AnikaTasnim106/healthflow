@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
+const { requireAuth, requireRole, requirePatientAccess } = require('../middleware/auth');
 
 const nz = (v) => (v === '' || v === undefined ? null : v);
 
@@ -30,24 +30,10 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), asy
   } catch (err) { next(err); }
 });
 
-router.get('/:id', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
+router.get('/:id', requireAuth, requirePatientAccess('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { role, doctor_id } = req.user;
-
-    if (role === 'doctor') {
-      const seen = await db.query(
-        `SELECT 1 FROM appointment
-         WHERE patient_id = $1 AND doctor_id = $2
-         LIMIT 1`,
-        [id, doctor_id]
-      );
-      if (seen.rows.length === 0) {
-        return res.status(403).json({
-          error: 'You can only view patients who have an appointment with you'
-        });
-      }
-    }
 
     const patient = await db.query(
       `SELECT * FROM patient WHERE patient_id = $1`, [id]
@@ -137,7 +123,7 @@ router.put('/:id', requireAuth, requireRole('admin', 'receptionist'), async (req
   }
 });
 
-router.patch('/:id/contact', requireAuth, requireOwnPatientRecord('id'), async (req, res, next) => {
+router.patch('/:id/contact', requireAuth, requirePatientAccess('id'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { phone, address } = req.body;

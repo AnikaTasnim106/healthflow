@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { requireAuth, requireRole, requireOwnPatientRecord } = require('../middleware/auth');
+const { requireAuth, requireRole, requirePatientAccess } = require('../middleware/auth');
 
 router.get('/catalog', requireAuth, async (req, res, next) => {
   try {
@@ -36,8 +36,11 @@ router.get('/pending', requireAuth, requireRole('admin', 'receptionist', 'doctor
 });
 
 
-router.get('/patient/:patientId', requireAuth, requireOwnPatientRecord('patientId'), async (req, res, next) => {
+router.get('/patient/:patientId', requireAuth, requirePatientAccess('patientId'), async (req, res, next) => {
   try {
+    const { role, doctor_id } = req.user;
+    const onlyMine = role === 'doctor' ? doctor_id : null;
+
     const result = await db.query(
       `SELECT pt.test_id, lt.test_name, lt.cost,
               pt.test_date, pt.result, d.name AS suggested_by
@@ -45,8 +48,9 @@ router.get('/patient/:patientId', requireAuth, requireOwnPatientRecord('patientI
        JOIN lab_test lt   ON pt.test_id   = lt.test_id
        LEFT JOIN doctor d ON pt.doctor_id = d.doctor_id
        WHERE pt.patient_id = $1
+         AND ($2::int IS NULL OR pt.doctor_id = $2)
        ORDER BY pt.test_date DESC`,
-      [req.params.patientId]
+      [req.params.patientId, onlyMine]
     );
     res.json(result.rows);
   } catch (err) { next(err); }
