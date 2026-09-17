@@ -1,10 +1,7 @@
-
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
-
 router.get('/', requireAuth, requireRole('admin', 'receptionist', 'patient'), async (req, res, next) => {
   try {
     const { role, patient_id } = req.user;
@@ -26,7 +23,6 @@ router.get('/', requireAuth, requireRole('admin', 'receptionist', 'patient'), as
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
 router.get('/due', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -43,7 +39,6 @@ router.get('/due', requireAuth, requireRole('admin', 'receptionist'), async (req
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
 router.get('/revenue', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const result = await db.query(
@@ -62,7 +57,6 @@ router.get('/revenue', requireAuth, requireRole('admin', 'receptionist'), async 
     res.json(result.rows);
   } catch (err) { next(err); }
 });
-
 router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const admissionId = req.params.id;
@@ -91,7 +85,6 @@ router.post('/from-admission/:id', requireAuth, requireRole('admin', 'receptioni
     next(err);
   }
 });
-
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -104,7 +97,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
     if (bill.rows.length === 0) {
       return res.status(404).json({ error: 'Bill not found' });
     }
-
     const { role, patient_id } = req.user;
     if (role === 'patient' && bill.rows[0].patient_id !== patient_id) {
       return res.status(403).json({ error: 'You can only access your own bills' });
@@ -121,7 +113,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
     res.json({ ...bill.rows[0], items: items.rows, payments: payments.rows });
   } catch (err) { next(err); }
 });
-
 router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { patient_id, admission_id, items } = req.body;
@@ -159,17 +150,50 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist'), async (req, 
     res.status(201).json(bill);
   } catch (err) { next(err); }
 });
-
 router.post('/:id/payment', requireAuth, requireRole('admin', 'receptionist'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { method, paid_amount } = req.body;
 
+    const amount = Number(paid_amount);
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Enter an amount above zero' });
+    }
+
     const updatedBill = await db.withTransaction(async (client) => {
+      const bill = await client.query(
+        `SELECT b.bill_id, b.total_amount,
+                COALESCE((SELECT SUM(paid_amount) FROM payment
+                          WHERE bill_id = b.bill_id), 0) AS already_paid
+         FROM bill b
+         WHERE b.bill_id = $1
+         FOR UPDATE`,
+        [id]
+      );
+
+      if (bill.rows.length === 0) {
+        throw { status: 404, message: 'Bill not found' };
+      }
+
+      const total = Number(bill.rows[0].total_amount);
+      const paid  = Number(bill.rows[0].already_paid);
+      const due   = total - paid;
+
+      if (due <= 0) {
+        throw { status: 409, message: 'This bill is already settled in full' };
+      }
+
+      if (amount > due) {
+        throw {
+          status: 409,
+          message: `Only ${due.toLocaleString('en-IN')} is still due on this bill`
+        };
+      }
+
       await client.query(
         `INSERT INTO payment (bill_id, method, paid_amount)
          VALUES ($1, $2, $3)`,
-        [id, method, paid_amount]
+        [id, method, amount]
       );
 
       const result = await client.query(
@@ -194,7 +218,10 @@ router.post('/:id/payment', requireAuth, requireRole('admin', 'receptionist'), a
 
     res.status(201).json(updatedBill);
   } catch (err) {
-    if (err.status === 404) return res.status(404).json({ error: err.message });
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.code === '23514') {
+      return res.status(400).json({ error: 'Payment amount must be above zero' });
+    }
     next(err);
   }
 });
