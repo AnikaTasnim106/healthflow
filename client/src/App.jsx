@@ -26,6 +26,7 @@ import LabTests from './pages/LabTests';
 import Medicines from './pages/Medicines';
 import Pharmacy from './pages/Pharmacy';
 import Billing from './pages/Billing';
+import Reports from './pages/Reports';        
 
 import './App.css';
 
@@ -44,6 +45,7 @@ const PAGES = {
   medicines:     { label: 'Medicines',     component: Medicines },
   pharmacy:      { label: 'Pharmacy',      component: Pharmacy },
   billing:       { label: 'Billing',       component: Billing },
+    reports:       { label: 'Reports',       component: Reports },   
 };
 
 function Shell() {

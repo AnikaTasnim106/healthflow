@@ -25,6 +25,7 @@ app.use('/api/labtests',      require('./routes/labtests'));
 app.use('/api/medicines',     require('./routes/medicines'));
 app.use('/api/pharmacy',      require('./routes/pharmacy'));
 app.use('/api/billing',       require('./routes/billing'));
+app.use('/api/reports',       require('./routes/reports'));
 
 app.get('/', (req, res) => {
   res.json({ message: 'HealthFlow API is running' });

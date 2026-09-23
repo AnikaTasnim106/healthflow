@@ -170,4 +170,10 @@ export const getPrescLines     = (prescId) => api.get(`/pharmacy/prescription/${
 export const dispenseMedicines = (data) => api.post('/pharmacy/dispense', data);
 export const reverseDispense   = (id) => api.delete(`/pharmacy/dispense/${id}`);
 
+export const getReportMonths         = ()      => api.get('/reports/months');
+export const getReportSummary        = (month) => api.get('/reports/summary', { params: { month } });
+export const getReportDepartments    = (month) => api.get('/reports/departments', { params: { month } });
+export const getReportRevenueSources = (month) => api.get('/reports/revenue-sources', { params: { month } });
+export const getReportMonthly        = ()      => api.get('/reports/monthly');
+export const getReportTopDoctors     = (month) => api.get('/reports/top-doctors', { params: { month } });
 export default api;

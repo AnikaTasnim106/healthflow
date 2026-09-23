@@ -25,6 +25,7 @@ export const NAV_BY_ROLE = {
   admin: [
     'patients', 'doctors', 'departments', 'schedule', 'appointments',
     'admissions', 'rooms', 'prescriptions', 'labtests', 'medicines', 'pharmacy', 'billing',
+    'reports',
   ],
   receptionist: [
     'patients', 'appointments', 'admissions', 'rooms', 'medicines', 'pharmacy', 'billing',
