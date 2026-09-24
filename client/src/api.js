@@ -89,6 +89,7 @@ export const createPatient = (data)        => api.post('/patients', data);
 export const updatePatient = (id, data)    => api.put(`/patients/${id}`, data);
 export const deletePatient = (id)          => api.delete(`/patients/${id}`);
 export const updateContact = (id, data)    => api.patch(`/patients/${id}/contact`, data);
+export const createPatientLogin = (id, data) => api.post(`/patients/${id}/login`, data);
 
 // ---------- DEPARTMENTS ----------
 export const getDepartments   = () => api.get('/departments');
@@ -170,10 +171,12 @@ export const getPrescLines     = (prescId) => api.get(`/pharmacy/prescription/${
 export const dispenseMedicines = (data) => api.post('/pharmacy/dispense', data);
 export const reverseDispense   = (id) => api.delete(`/pharmacy/dispense/${id}`);
 
-export const getReportMonths         = ()      => api.get('/reports/months');
+export const getReportMonths         = () => api.get('/reports/months');
 export const getReportSummary        = (month) => api.get('/reports/summary', { params: { month } });
-export const getReportDepartments    = (month) => api.get('/reports/departments', { params: { month } });
 export const getReportRevenueSources = (month) => api.get('/reports/revenue-sources', { params: { month } });
-export const getReportMonthly        = ()      => api.get('/reports/monthly');
 export const getReportTopDoctors     = (month) => api.get('/reports/top-doctors', { params: { month } });
+export const getReportDepartments    = (month) => api.get('/reports/departments', { params: { month } });
+export const getReportMonthly        = () => api.get('/reports/monthly');
+export const getReportOutstanding    = () => api.get('/reports/outstanding');
+
 export default api;

@@ -4,7 +4,10 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import { getPatients, createPatient, updatePatient, deletePatient } from '../api';
+import { useAuth } from '../auth';
+import {
+  getPatients, createPatient, updatePatient, deletePatient, createPatientLogin,
+} from '../api';
 
 // Blood group family drives the chart spine colour on each row.
 function spineOf(bg) {
@@ -20,12 +23,18 @@ function age(dob) {
 }
 
 export default function Patients() {
+  const { user } = useAuth();
+  const isAdmin = user.role === 'admin';
+
   const [patients, setPatients] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [search, setSearch]     = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId]     = useState(null);   // null = notun, id = edit
+  const [editId, setEditId]     = useState(null);
+  const [loginFor, setLoginFor] = useState(null);
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [notice, setNotice]     = useState('');
 
   const emptyForm = {
     name: '', dob: '', gender: 'M',
@@ -90,6 +99,23 @@ export default function Patients() {
     setForm(emptyForm);
   }
 
+  async function handleCreateLogin(p) {
+    if (!loginForm.email || !loginForm.password) {
+      setError('Enter an email and a password.');
+      return;
+    }
+    try {
+      setError('');
+      await createPatientLogin(p.patient_id, loginForm);
+      setLoginFor(null);
+      setLoginForm({ email: '', password: '' });
+      setNotice(`${p.name} can now sign in with ${loginForm.email}.`);
+      loadPatients();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not create this login.');
+    }
+  }
+
   async function handleDelete(id, name) {
     if (!window.confirm(`Remove ${name} from the registry?`)) return;
     try {
@@ -127,6 +153,16 @@ export default function Patients() {
         <div className="alert">
           <span>{error}</span>
           <button className="x" onClick={() => setError('')}>Dismiss</button>
+        </div>
+      )}
+      {notice && (
+        <div className="alert" style={{
+          background: 'var(--clear-pale)', borderColor: '#c8ddd0',
+          borderLeftColor: 'var(--clear)', color: 'var(--clear)',
+        }}>
+          <span>{notice}</span>
+          <button className="x" style={{ color: 'var(--clear)' }}
+            onClick={() => setNotice('')}>Dismiss</button>
         </div>
       )}
 
@@ -203,7 +239,7 @@ export default function Patients() {
                 <th>Blood</th>
                 <th>Age</th>
                 <th>Phone</th>
-                <th>Address</th>
+                <th>Login</th>
                 <th className="right">Action</th>
               </tr>
             </thead>
@@ -218,7 +254,31 @@ export default function Patients() {
                   <td><span className="blood">{p.blood_group || '—'}</span></td>
                   <td><span className="data">{age(p.dob)}</span></td>
                   <td><span className="data">{p.phone || '—'}</span></td>
-                  <td>{p.address || '—'}</td>
+                  <td>
+                    {p.login_email
+                      ? <span className="sub">{p.login_email}</span>
+                      : loginFor === p.patient_id ? (
+                          <div className="pay-form">
+                            <input type="email" placeholder="email" autoFocus
+                              value={loginForm.email} style={{ minWidth: 150 }}
+                              onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} />
+                            <input type="password" placeholder="password"
+                              value={loginForm.password} style={{ maxWidth: 120 }}
+                              onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} />
+                            <button className="btn primary sm"
+                              onClick={() => handleCreateLogin(p)}>Create</button>
+                            <button className="btn ghost sm"
+                              onClick={() => { setLoginFor(null); setLoginForm({ email: '', password: '' }); }}>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button className="btn sm"
+                            onClick={() => { setLoginFor(p.patient_id); setLoginForm({ email: '', password: '' }); }}>
+                            Give login
+                          </button>
+                        )}
+                  </td>
                   <td className="right">
                     <button className="btn sm" onClick={() => startEdit(p)}>Edit</button>
                     {' '}

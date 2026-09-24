@@ -143,13 +143,15 @@ router.patch('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, async
       return res.status(400).json({ error: 'is_active must be true or false' });
     }
 
-    const result = await db.query(
-      `UPDATE doctor_schedule
-       SET is_active = $1
-       WHERE schedule_id = $2 AND doctor_id = $3
-       RETURNING *`,
-      [is_active, req.params.scheduleId, req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE doctor_schedule
+         SET is_active = $1
+         WHERE schedule_id = $2 AND doctor_id = $3
+         RETURNING *`,
+        [is_active, req.params.scheduleId, req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Schedule slot not found' });
@@ -171,12 +173,14 @@ router.delete('/:id/schedule/:scheduleId', requireAuth, requireOwnSchedule, asyn
       });
     }
 
-    const result = await db.query(
-      `DELETE FROM doctor_schedule
-       WHERE schedule_id = $1 AND doctor_id = $2
-       RETURNING schedule_id`,
-      [req.params.scheduleId, req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `DELETE FROM doctor_schedule
+         WHERE schedule_id = $1 AND doctor_id = $2
+         RETURNING schedule_id`,
+        [req.params.scheduleId, req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Schedule slot not found' });
@@ -291,18 +295,20 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => 
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    const result = await db.query(
-      `UPDATE doctor
-       SET name = $1, specialization = $2, phone = $3,
-           consult_fee = $4, dept_id = $5
-       WHERE doctor_id = $6
-       RETURNING *`,
-      [
-        name.trim(), nz(specialization), nz(phone),
-        consult_fee === '' || consult_fee == null ? 0 : Number(consult_fee),
-        Number(dept_id), req.params.id,
-      ]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE doctor
+         SET name = $1, specialization = $2, phone = $3,
+             consult_fee = $4, dept_id = $5
+         WHERE doctor_id = $6
+         RETURNING *`,
+        [
+          name.trim(), nz(specialization), nz(phone),
+          consult_fee === '' || consult_fee == null ? 0 : Number(consult_fee),
+          Number(dept_id), req.params.id,
+        ]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Doctor not found' });
@@ -320,10 +326,12 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => 
 });
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
-    const result = await db.query(
-      `DELETE FROM doctor WHERE doctor_id = $1 RETURNING doctor_id`,
-      [req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `DELETE FROM doctor WHERE doctor_id = $1 RETURNING doctor_id`,
+        [req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Doctor not found' });

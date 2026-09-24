@@ -91,7 +91,7 @@ router.post('/', requireAuth, requireRole('admin', 'doctor'), async (req, res, n
     }
 
     const appt = await db.query(
-      `SELECT doctor_id, status FROM appointment WHERE appt_id = $1`,
+      `SELECT doctor_id, status, appt_date FROM appointment WHERE appt_id = $1`,
       [appt_id]
     );
 
@@ -108,6 +108,15 @@ router.post('/', requireAuth, requireRole('admin', 'doctor'), async (req, res, n
     if (appt.rows[0].status === 'Cancelled' || appt.rows[0].status === 'No-Show') {
       return res.status(400).json({
         error: `Cannot prescribe against a ${appt.rows[0].status.toLowerCase()} appointment`
+      });
+    }
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const apptDay = new Date(appt.rows[0].appt_date); apptDay.setHours(0, 0, 0, 0);
+
+    if (apptDay > today) {
+      return res.status(400).json({
+        error: 'This appointment has not happened yet'
       });
     }
 

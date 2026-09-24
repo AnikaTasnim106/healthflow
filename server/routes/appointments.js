@@ -234,10 +234,12 @@ router.patch('/:id/status', requireAuth, requireRole('admin', 'receptionist', 'd
       }
     }
 
-    const result = await db.query(
-      `UPDATE appointment SET status = $1 WHERE appt_id = $2 RETURNING *`,
-      [status, req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE appointment SET status = $1 WHERE appt_id = $2 RETURNING *`,
+        [status, req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Appointment not found' });
@@ -274,10 +276,12 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
       });
     }
 
-    const result = await db.query(
-      `UPDATE appointment SET status = 'Cancelled' WHERE appt_id = $1 RETURNING *`,
-      [req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE appointment SET status = 'Cancelled' WHERE appt_id = $1 RETURNING *`,
+        [req.params.id]
+      );
+    });
     res.json({ message: 'Appointment cancelled', appointment: result.rows[0] });
   } catch (err) { next(err); }
 });

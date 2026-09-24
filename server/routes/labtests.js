@@ -80,12 +80,14 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), as
       ? doctor_id
       : (req.body.doctor_id || null);
 
-    const result = await db.query(
-      `INSERT INTO patient_test (patient_id, test_id, doctor_id, test_date)
-       VALUES ($1, $2, $3, COALESCE($4, CURRENT_DATE))
-       RETURNING *`,
-      [patient_id, test_id, suggestedBy, test_date || null]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `INSERT INTO patient_test (patient_id, test_id, doctor_id, test_date)
+         VALUES ($1, $2, $3, COALESCE($4, CURRENT_DATE))
+         RETURNING *`,
+        [patient_id, test_id, suggestedBy, test_date || null]
+      );
+    });
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -128,13 +130,15 @@ router.patch('/:patientId/:testId/:testDate', requireAuth, requireRole('admin', 
       });
     }
 
-    const result = await db.query(
-      `UPDATE patient_test
-       SET result = $1
-       WHERE patient_id = $2 AND test_id = $3 AND test_date = $4
-       RETURNING *`,
-      [String(testResult).trim(), patientId, testId, testDate]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE patient_test
+         SET result = $1
+         WHERE patient_id = $2 AND test_id = $3 AND test_date = $4
+         RETURNING *`,
+        [String(testResult).trim(), patientId, testId, testDate]
+      );
+    });
 
     res.json(result.rows[0]);
   } catch (err) { next(err); }

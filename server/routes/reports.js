@@ -73,6 +73,8 @@ router.get('/summary', async (req, res, next) => {
          (SELECT COUNT(*) FROM room
           WHERE status = 'Occupied') AS occupied_rooms,
 
+         fn_occupancy_rate() AS occupancy_rate,
+
          (SELECT COUNT(*) FROM medicine
           WHERE stock_qty < $2) AS low_stock_medicines`,
       [month, LOW_STOCK]
@@ -121,10 +123,7 @@ router.get('/top-doctors', async (req, res, next) => {
               COUNT(a.appt_id) AS appointment_count,
               COUNT(a.appt_id) FILTER (WHERE a.status = 'Completed') AS completed_count,
               COUNT(DISTINCT a.patient_id) AS patient_count,
-              COALESCE(
-                COUNT(a.appt_id) FILTER (WHERE a.status = 'Completed') * d.consult_fee,
-                0
-              ) AS revenue
+              fn_doctor_revenue(d.doctor_id, $1) AS revenue
        FROM doctor d
        JOIN department dep ON d.dept_id = dep.dept_id
        LEFT JOIN appointment a ON a.doctor_id = d.doctor_id
@@ -175,6 +174,22 @@ router.get('/departments', async (req, res, next) => {
     );
 
     res.json({ month, departments: result.rows });
+  } catch (err) { next(err); }
+});
+
+
+router.get('/outstanding', async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT p.patient_id, p.name, p.phone,
+              fn_patient_age(p.patient_id) AS age,
+              fn_patient_due(p.patient_id)  AS due
+       FROM patient p
+       WHERE fn_patient_due(p.patient_id) > 0
+       ORDER BY due DESC
+       LIMIT 20`
+    );
+    res.json(result.rows);
   } catch (err) { next(err); }
 });
 
