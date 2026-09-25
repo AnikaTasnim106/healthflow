@@ -45,7 +45,7 @@ const PAGES = {
   medicines:     { label: 'Medicines',     component: Medicines },
   pharmacy:      { label: 'Pharmacy',      component: Pharmacy },
   billing:       { label: 'Billing',       component: Billing },
-    reports:       { label: 'Reports',       component: Reports },   
+  reports:       { label: 'Reports',       component: Reports },   
 };
 
 function Shell() {
