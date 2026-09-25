@@ -58,12 +58,14 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
       return res.status(400).json({ error: 'Daily charge must be more than zero' });
     }
 
-    const result = await db.query(
-      `INSERT INTO room (room_no, room_type, daily_charge)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [room_no.trim(), room_type, Number(daily_charge)]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `INSERT INTO room (room_no, room_type, daily_charge)
+         VALUES ($1, $2, $3)
+         RETURNING *`,
+        [room_no.trim(), room_type, Number(daily_charge)]
+      );
+    });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -85,13 +87,15 @@ router.put('/:roomNo', requireAuth, requireRole('admin'), async (req, res, next)
       return res.status(400).json({ error: 'Daily charge must be more than zero' });
     }
 
-    const result = await db.query(
-      `UPDATE room
-       SET room_type = $1, daily_charge = $2
-       WHERE room_no = $3
-       RETURNING *`,
-      [room_type, Number(daily_charge), req.params.roomNo]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE room
+         SET room_type = $1, daily_charge = $2
+         WHERE room_no = $3
+         RETURNING *`,
+        [room_type, Number(daily_charge), req.params.roomNo]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Room not found' });
@@ -158,10 +162,12 @@ router.patch('/:roomNo/status', requireAuth, requireRole('admin', 'receptionist'
 
 router.delete('/:roomNo', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
-    const result = await db.query(
-      `DELETE FROM room WHERE room_no = $1 RETURNING room_no`,
-      [req.params.roomNo]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `DELETE FROM room WHERE room_no = $1 RETURNING room_no`,
+        [req.params.roomNo]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Room not found' });

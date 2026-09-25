@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -8,32 +6,26 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
 const TOKEN_EXPIRES_IN = '7d';
-
 router.post('/register', async (req, res, next) => {
   try {
-    const { email, password, name, patient_id } = req.body;
+    const { email, password, name } = req.body;
 
     if (!email || !password || !name) {
       return res.status(400).json({ error: 'email, password and name are required' });
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Enter a valid email address' });
+    }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
-
-    
     const passwordHash = await bcrypt.hash(password, 10);
-
-    
     const created = await db.withTransaction(async (client) => {
-      let linkedPatientId = patient_id || null;
-
-      if (!linkedPatientId) {
-        const p = await client.query(
-          `INSERT INTO patient (name) VALUES ($1) RETURNING patient_id`,
-          [name]
-        );
-        linkedPatientId = p.rows[0].patient_id;
-      }
+      const p = await client.query(
+        `INSERT INTO patient (name) VALUES ($1) RETURNING patient_id`,
+        [name.trim()]
+      );
+      const linkedPatientId = p.rows[0].patient_id;
 
       const u = await client.query(
         `INSERT INTO app_user (email, password_hash, full_name, role, patient_id)
@@ -52,8 +44,6 @@ router.post('/register', async (req, res, next) => {
     next(err);
   }
 });
-
-
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -68,7 +58,6 @@ router.post('/login', async (req, res, next) => {
        FROM app_user WHERE email = $1`,
       [email]
     );
-
     if (userResult.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -83,13 +72,13 @@ router.post('/login', async (req, res, next) => {
     if (!passwordMatches) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-
-    const sessionResult = await db.query(
-      `INSERT INTO auth_sessions (user_id) VALUES ($1) RETURNING session_id`,
-      [user.user_id]
-    );
+    const sessionResult = await db.withTransaction(async (client) => {
+      return client.query(
+  `INSERT INTO auth_sessions (user_id) VALUES ($1) RETURNING session_id`,
+        [user.user_id]
+      );
+    });
     const sessionId = sessionResult.rows[0].session_id;
-
     const token = jwt.sign(
       { session_id: sessionId, user_id: user.user_id },
       process.env.JWT_SECRET,
@@ -109,19 +98,17 @@ router.post('/login', async (req, res, next) => {
     });
   } catch (err) { next(err); }
 });
-
-
 router.post('/logout', requireAuth, async (req, res, next) => {
   try {
-    await db.query(
-      `DELETE FROM auth_sessions WHERE session_id = $1`,
-      [req.sessionId]
-    );
+    await db.withTransaction(async (client) => {
+      return client.query(
+        `DELETE FROM auth_sessions WHERE session_id = $1`,
+        [req.sessionId]
+      );
+    });
     res.json({ message: 'Logged out successfully' });
   } catch (err) { next(err); }
 });
-
-
 router.get('/me', requireAuth, async (req, res) => {
   res.json({
     user: {
@@ -134,6 +121,5 @@ router.get('/me', requireAuth, async (req, res) => {
     }
   });
 });
-
 
 module.exports = router;

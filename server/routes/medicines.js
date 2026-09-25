@@ -58,16 +58,18 @@ router.post('/', requireAuth, requireRole('admin', 'doctor'), async (req, res, n
       return res.status(400).json({ error: 'Medicine name is required' });
     }
 
-    const result = await db.query(
-      `INSERT INTO medicine (name, unit_price, stock_qty)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [
-        name.trim(),
-        unit_price === '' || unit_price == null ? 0 : Number(unit_price),
-        stock_qty === '' || stock_qty == null ? 0 : Number(stock_qty),
-      ]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `INSERT INTO medicine (name, unit_price, stock_qty)
+         VALUES ($1, $2, $3)
+         RETURNING *`,
+        [
+          name.trim(),
+          unit_price === '' || unit_price == null ? 0 : Number(unit_price),
+          stock_qty === '' || stock_qty == null ? 0 : Number(stock_qty),
+        ]
+      );
+    });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23514') {
@@ -86,17 +88,19 @@ router.put('/:id', requireAuth, requireRole('admin', 'doctor'), async (req, res,
       return res.status(400).json({ error: 'Medicine name is required' });
     }
 
-    const result = await db.query(
-      `UPDATE medicine
-       SET name = $1, unit_price = $2
-       WHERE med_id = $3
-       RETURNING *`,
-      [
-        name.trim(),
-        unit_price === '' || unit_price == null ? 0 : Number(unit_price),
-        req.params.id,
-      ]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE medicine
+         SET name = $1, unit_price = $2
+         WHERE med_id = $3
+         RETURNING *`,
+        [
+          name.trim(),
+          unit_price === '' || unit_price == null ? 0 : Number(unit_price),
+          req.params.id,
+        ]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Medicine not found' });
@@ -120,13 +124,15 @@ router.patch('/:id/stock', requireAuth, requireRole('admin', 'receptionist'), as
       return res.status(400).json({ error: 'Enter how many units to add or remove' });
     }
 
-    const result = await db.query(
-      `UPDATE medicine
-       SET stock_qty = stock_qty + $1
-       WHERE med_id = $2
-       RETURNING *`,
-      [qty, req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE medicine
+         SET stock_qty = stock_qty + $1
+         WHERE med_id = $2
+         RETURNING *`,
+        [qty, req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Medicine not found' });
@@ -143,10 +149,12 @@ router.patch('/:id/stock', requireAuth, requireRole('admin', 'receptionist'), as
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
-    const result = await db.query(
-      `DELETE FROM medicine WHERE med_id = $1 RETURNING med_id`,
-      [req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `DELETE FROM medicine WHERE med_id = $1 RETURNING med_id`,
+        [req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Medicine not found' });

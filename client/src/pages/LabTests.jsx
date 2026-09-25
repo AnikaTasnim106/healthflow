@@ -1,4 +1,19 @@
+// ============================================================
+//  LabTests.jsx
+//
+//  Ei page ta patient_test table er upor kaj kore — jeta amader
+//  M:N junction table (patient <-> lab_test), ar tar PK holo
+//  (patient_id, test_id, test_date) — teen ta column mile.
+//
+//  Ei jonno result add korte tin tai lagbe, shudhu ekta id na.
+//
+//  Duita view:
+//    Pending  — jei test er result ekhono ashe nai
+//    History  — ek patient er sob test, result shoho
+// ============================================================
+
 import { useState, useEffect } from 'react';
+import { useAuth } from '../auth';
 import {
   getPendingTests, getTestCatalog, getPatientTests,
   assignTest, addTestResult, getPatients, getDoctors,
@@ -12,15 +27,29 @@ const prettyDate = (d) => {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 };
+
+// PATCH er URL e date lage — '2026-07-04' format e.
+//
+// ⚠️ .toISOString() use kora jabe na. Postgres er DATE column
+// node-postgres e local midnight hishebe ashe, tarpor JSON e
+// UTC te convert hoy. Dhaka UTC+6, tai midnight theke 6 ghonta
+// bad giye AGE ER DIN e chole jay — 30 tarikh 29 hoye jay.
+//
+// Local component (getFullYear/getMonth/getDate) niley
+// calendar date ta thik thake.
 const isoDate = (d) => {
   const dt = new Date(d);
-  const y   = dt.getFullYear();
-  const m   = String(dt.getMonth() + 1).padStart(2, '0');
+  const y  = dt.getFullYear();
+  const m  = String(dt.getMonth() + 1).padStart(2, '0');
   const day = String(dt.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
 export default function LabTests() {
-  const [view, setView] = useState('pending');
+  const { user } = useAuth();
+  const isDoctor = user.role === 'doctor';
+
+  const [view, setView] = useState('pending');       // 'pending' | 'history'
 
   const [pending, setPending]   = useState([]);
   const [catalog, setCatalog]   = useState([]);
@@ -35,6 +64,7 @@ export default function LabTests() {
   const [notice, setNotice]   = useState('');
   const [showForm, setShowForm] = useState(false);
 
+  // kon row e result likha hocche + ki likha hocche
   const [editKey, setEditKey]   = useState(null);
   const [resultText, setResultText] = useState('');
 
@@ -43,6 +73,7 @@ export default function LabTests() {
 
   useEffect(() => { loadAll(); }, []);
 
+  // patient select korle tar history ane
   useEffect(() => {
     if (!historyId) { setHistory([]); return; }
     getPatientTests(historyId)
@@ -85,6 +116,7 @@ export default function LabTests() {
       setNotice('Test ordered.');
       loadAll();
     } catch (err) {
+      // 409 = eki patient, eki test, eki date already ache (composite PK)
       setError(err.response?.data?.error || 'Could not order this test.');
     }
   }
@@ -152,6 +184,7 @@ export default function LabTests() {
         </div>
       )}
 
+      {/* ---------- order form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">Order a lab test</div>
@@ -182,13 +215,18 @@ export default function LabTests() {
 
             <label>
               Suggested by
-              <select value={form.doctor_id}
-                onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}>
-                <option value="">Not specified</option>
-                {doctors.map((d) => (
-                  <option key={d.doctor_id} value={d.doctor_id}>{d.name}</option>
-                ))}
-              </select>
+              {isDoctor ? (
+                <input value={user.name} disabled
+                  title="A doctor can only order tests under their own name" />
+              ) : (
+                <select value={form.doctor_id}
+                  onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}>
+                  <option value="">Not specified</option>
+                  {doctors.map((d) => (
+                    <option key={d.doctor_id} value={d.doctor_id}>{d.name}</option>
+                  ))}
+                </select>
+              )}
             </label>
 
             <label>
@@ -208,6 +246,7 @@ export default function LabTests() {
         </div>
       )}
 
+      {/* ---------- PENDING ---------- */}
       {view === 'pending' && (
         loading ? (
           <div className="loading">Loading pending tests</div>
@@ -271,6 +310,7 @@ export default function LabTests() {
         )
       )}
 
+      {/* ---------- HISTORY ---------- */}
       {view === 'history' && (
         <>
           <div className="toolbar">

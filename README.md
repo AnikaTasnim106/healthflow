@@ -1,161 +1,224 @@
-# HealthFlow — Setup Guide
+# HealthFlow
 
-Hospital Management System | CSE 215 Database Project
+Hospital management system — CSE 216 (Database Sessional) project.
 
----
-
-## Ki lagbe
-
-- **PostgreSQL 17+** (pgAdmin shoho) — https://www.postgresql.org/download/windows/
-- **Node.js 24 LTS** — https://nodejs.org (LTS button)
-- **Git** — https://git-scm.com/downloads
+PostgreSQL + Express + React. Raw SQL throughout, no ORM. Runs locally.
 
 ---
 
-## Setup (ekbar korte hobe, ~20 min)
+## What it does
 
-### 1. Repo clone
+Covers the full patient journey in three shapes:
 
-```bash
-git clone <repo-url>
-cd healthflow
-```
+- **Outpatient** — book an appointment, see a doctor, get a prescription, pay for the visit
+- **Admission** — take a room, run up charges through the stay, settle one bill on discharge
+- **Pharmacy** — fill a prescription at the hospital, or buy over the counter
 
-### 2. Database banao
+Four roles see four different systems. All access rules are enforced on the server.
 
-pgAdmin khulo → **Databases** e right-click → **Create → Database** → naam `healthflow` → Save.
+---
 
-Notun `healthflow` database ta **select koro**, tarpor **Tools → Query Tool**.
+## Setup
 
-Query Tool er 📂 icon diye file load kore **F5** press koro, ei order e:
+### Requirements
 
-1. `db/schema.sql` — 15 ta table banabe
-2. `db/seed.sql` — sample data dhukabe
+- PostgreSQL 17+ with pgAdmin
+- Node.js 22+ (LTS)
 
-Check koro kaj korse kina:
+### 1. Database
+
+Create a database called `healthflow`, then run these in pgAdmin's Query Tool
+**in this order** — later files depend on earlier ones:
+
+| # | File | What it creates |
+|---|---|---|
+| 1 | `db/schema.sql` | 15 core tables, constraints, indexes |
+| 2 | `db/seed.sql` | Sample patients, doctors, rooms, medicines |
+| 3 | `db/auth_schema.sql` | `app_user`, `auth_sessions`, demo logins |
+| 4 | `db/Pharmacy.sql` | `dispense` table, stock trigger |
+| 5 | `db/pharmacy_link.sql` | Links a dispense to its exact bill line |
+| 6 | `db/opd.sql` | Over-the-counter sales, outpatient bill procedure |
+| 7 | `db/functions.sql` | Computed-value functions |
+| 8 | `db/triggers.sql` | Triggers and stored procedures |
+
+> `db/schema.sql` starts with `DROP TABLE` — running it again wipes everything.
+> If you do, re-run all eight files.
+
+Check it worked:
 
 ```sql
-SELECT COUNT(*) FROM appointment;   -- 15 ashar kotha
-SELECT COUNT(*) FROM patient;       -- 12
-SELECT COUNT(*) FROM bill_item;     -- 27
+SELECT COUNT(*) FROM patient;            -- 12
+SELECT COUNT(*) FROM app_user;           -- 6
+SELECT trigger_name FROM information_schema.triggers
+  WHERE trigger_schema = 'public';       -- 4
+SELECT proname FROM pg_proc
+  WHERE proname LIKE 'fn_%' OR proname LIKE 'sp_%';
 ```
 
-### 3. Backend setup
+### 2. Backend
 
 ```bash
 cd server
 npm install
 ```
 
-Tarpor `.env.example` file ta **copy kore `.env` naam dao**, ar tomar postgres password bosao:
+Create `server/.env`:
 
 ```
-DB_PASSWORD=tomar_asol_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD="your_password"
+DB_NAME=healthflow
+PORT=5000
+JWT_SECRET=healthflow_dev_secret_2026
 ```
 
-⚠️ `.env` file ta git e uthbe na (`.gitignore` e deya ache). Prottek jon nijer computer e nijer `.env` banabe.
-
-### 4. Server chalao
+> Quote the password if it contains `#` or a space — dotenv treats `#`
+> as the start of a comment and silently drops the rest.
 
 ```bash
 npm run dev
 ```
 
-Terminal e eirokom ashle ✅ sob thik ache:
+Expect `Server running on http://localhost:5000` and `PostgreSQL connected`.
 
-```
-🚀 Server running on http://localhost:5000
-✅ PostgreSQL connected — healthflow
+### 3. Frontend
+
+In a second terminal:
+
+```bash
+cd client
+npm install
+npm run dev
 ```
 
-Browser e `http://localhost:5000/api/patients` e gele 12 ta patient er JSON dekhbe.
+Open http://localhost:5173
+
+> On Windows, if `npm install` reports "running scripts is disabled",
+> switch the VS Code terminal to Command Prompt, or run once in PowerShell:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
 ---
 
-## Folder structure
+## Demo accounts
+
+Password for all of them: `Pass@123`
+
+| Email | Role |
+|---|---|
+| `admin@healthflow.com` | admin |
+| `reception@healthflow.com` | receptionist |
+| `rezaul.karim@healthflow.com` | doctor (Dr. Rezaul Karim) |
+| `aminul.haque@healthflow.com` | doctor (Dr. Aminul Haque) |
+| `rahim.uddin@mail.com` | patient (Rahim Uddin) |
+| `fatema.khatun@mail.com` | patient (Fatema Khatun) |
+
+The two patient accounts are useful together — signing in as one and asking
+for the other's records returns 403.
+
+---
+
+## Roles
+
+| | admin | receptionist | doctor | patient |
+|---|---|---|---|---|
+| Patients | full | register, edit | own patients only | own record |
+| Doctors | full | view | view | — |
+| Departments | full | — | — | — |
+| Schedules | any doctor | — | own only | — |
+| Appointments | full | book, cancel | own only | own, cancel |
+| Admissions | full | admit, discharge | — | own |
+| Rooms | full | status only | — | — |
+| Prescriptions | full | — | write, own only | own |
+| Lab tests | full | order, results | own orders only | own results |
+| Medicines | full | restock | add to catalog | — |
+| Pharmacy | full | dispense, sell | — | — |
+| Billing | full | bill, take payment | — | own bills |
+| Reports | full | — | — | — |
+
+Hiding a menu item is presentation only. Every rule above is also checked in
+`server/middleware/auth.js` and in each route, so hitting the API directly
+with Postman gives the same 401 / 403.
+
+---
+
+## Project structure
 
 ```
 healthflow/
-├── db/
-│   ├── schema.sql          ✅ DDL — 15 tables
-│   ├── seed.sql            ✅ sample data
-│   ├── queries.sql         ⬜ TODO — 20 queries
-│   └── triggers.sql        ⬜ TODO — triggers + procedures
-│
+├── db/                  all SQL — schema, seed, auth, triggers, functions
 ├── server/
-│   ├── db.js               ✅ PostgreSQL pool + query() + withTransaction()
-│   ├── index.js            ✅ Express app
-│   ├── .env                ⚠️ nijer banate hobe (git e nai)
-│   ├── .env.example        ✅ template
-│   └── routes/
-│       ├── patients.js     ✅ FULL CRUD — ⭐ eta reference, dekhe likho
-│       ├── doctors.js      🟡 partial
-│       ├── appointments.js 🟡 partial
-│       └── billing.js      🟡 partial
-│
-└── client/                 ⬜ TODO — React (Week 3-4)
+│   ├── db.js            connection pool, query(), withTransaction()
+│   ├── index.js         express app, route registration
+│   ├── middleware/
+│   │   └── auth.js      requireAuth, requireRole, requirePatientAccess
+│   └── routes/          13 route modules — all SQL lives here
+└── client/
+    └── src/
+        ├── api.js       every API call, token storage, interceptors
+        ├── auth.jsx     logged-in user, role → menu mapping
+        ├── App.jsx      login gate and sidebar
+        └── pages/       15 screens
 ```
 
+No SQL in the frontend. No `pg` import outside `server/db.js`.
+
 ---
 
-## Route likhar niyom
+## Design notes
 
-`routes/patients.js` **puro complete** — baki gulo ei pattern e likho.
+**Weak entity.** `bill_item` has no identity without its bill. `item_no` is a
+partial key, unique only inside one bill, so the primary key is
+`(bill_id, item_no)` and the rows cascade when the bill is deleted.
 
-**3 ta rule:**
+**Relationship attributes.** `dosage`, `frequency` and `duration` live on
+`presc_medicine`, not on `medicine` or `prescription` — the dose belongs to
+the pairing, not to either side.
 
-**1. Value always `$1, $2` diye pathabe** — string concat kore query banabe na, SQL injection hobe.
+**Partial unique index.** `uq_room_active` allows one active admission per
+room while keeping the room's full history:
 
-```js
-// ✅
-db.query('SELECT * FROM patient WHERE patient_id = $1', [id])
-
-// ❌ kokhono na
-db.query('SELECT * FROM patient WHERE patient_id = ' + id)
+```sql
+CREATE UNIQUE INDEX uq_room_active ON admission(room_no)
+  WHERE discharge_date IS NULL;
 ```
 
-**2. Sob route `try/catch` er bhitor, error `next(err)` e pathabe.** `index.js` er error handler dhorbe.
+`uq_dispense_line` uses the same idea so a prescription line can be dispensed
+once, while over-the-counter sales of the same medicine can repeat.
 
-**3. Ekadhik table ekshathe change hole `withTransaction` use korbe.** Example `billing.js` er POST route e ache — bill + bill_item ekshathe insert hoy, ekta fail korle dutoi rollback.
+**Prescribing is not dispensing.** A prescription is an instruction; stock only
+moves when the pharmacy hands the medicine over. The stock trigger fires on
+`dispense`, not on `presc_medicine`, so a patient filling the prescription
+somewhere else leaves the hospital's stock untouched.
 
----
+**One stay, one bill.** The bill opens when the patient is admitted and
+collects charges through the stay. On discharge the stored procedure adds the
+room charge, lab tests and doctor fees to that same bill.
 
-## Postgres error code cheat sheet
+**Transactions.** Every insert, update and delete runs inside
+`withTransaction` — `BEGIN`, `COMMIT`, `ROLLBACK` on failure.
 
-Route e `err.code` check kore user-friendly message dile marks bhalo pabe:
+**Parameterised queries.** Every value goes through `$1`, `$2`. No string
+concatenation anywhere.
 
-| Code | Ki hoyeche | Kokhon ashe |
-|---|---|---|
-| `23505` | UNIQUE violation | Same doctor er same slot e duibar appointment |
-| `23503` | FK violation | Jar bill ache emon patient delete korte gele |
-| `23514` | CHECK violation | Bhul blood group / gender / room type |
-| `23502` | NOT NULL violation | Required field missing |
-
----
-
-## Kaj bhag
-
-| Anika | Partner |
-|---|---|
-| `db/queries.sql` | `server/routes/` |
-| `db/triggers.sql` | `client/` |
-
-**Eki file e dujon ekshathe hat dibo na.** Kaj shuru korar age group e bole nibo.
-
-Daily:
-```bash
-git pull          # kaj shurur AGE
-# ... kaj ...
-git add .
-git commit -m "ki korlam"
-git push          # kaj sheshe
-```
+**Logout is real.** A login writes a row to `auth_sessions` and the token
+carries its id. Logout deletes the row, so the old token fails on the next
+request — the middleware checks the session exists, not just that the
+signature is valid.
 
 ---
 
-## Ekhono baki
+## Known limitations
 
-- [ ] `db/queries.sql` — 20 ta query (join, aggregation, subquery, window function)
-- [ ] `db/triggers.sql` — bill total auto-update, room status update, stock deduct
-- [ ] `doctors.js`, `appointments.js`, `billing.js` — baki endpoint gulo
-- [ ] React frontend
+- The database records income only. Salaries, purchase costs and utilities are
+  not stored, so net profit cannot be derived — the reports show billed,
+  collected and outstanding instead.
+- A few endpoints are action-shaped rather than resource-shaped, for example
+  `POST /billing/from-admission/:id`. A stricter REST reading would express
+  these as filters or sub-resources.
+- Reversing a dispense restores stock and removes the charge, but only while
+  the bill is still unpaid. Once money has been taken it becomes a refund,
+  which is out of scope.
+- Tokens are kept in `localStorage`, which is exposed to XSS. An `httpOnly`
+  cookie would be safer but needs CSRF protection to go with it.

@@ -28,11 +28,13 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
       return res.status(400).json({ error: 'Department name is required' });
     }
 
-    const result = await db.query(
-      `INSERT INTO department (dept_name, location)
-       VALUES ($1, $2) RETURNING *`,
-      [dept_name.trim(), nz(location)]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `INSERT INTO department (dept_name, location)
+         VALUES ($1, $2) RETURNING *`,
+        [dept_name.trim(), nz(location)]
+      );
+    });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -51,13 +53,15 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => 
       return res.status(400).json({ error: 'Department name is required' });
     }
 
-    const result = await db.query(
-      `UPDATE department
-       SET dept_name = $1, location = $2
-       WHERE dept_id = $3
-       RETURNING *`,
-      [dept_name.trim(), nz(location), req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `UPDATE department
+         SET dept_name = $1, location = $2
+         WHERE dept_id = $3
+         RETURNING *`,
+        [dept_name.trim(), nz(location), req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Department not found' });
@@ -74,10 +78,12 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res, next) => 
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
-    const result = await db.query(
-      `DELETE FROM department WHERE dept_id = $1 RETURNING dept_id`,
-      [req.params.id]
-    );
+    const result = await db.withTransaction(async (client) => {
+      return client.query(
+  `DELETE FROM department WHERE dept_id = $1 RETURNING dept_id`,
+        [req.params.id]
+      );
+    });
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Department not found' });
