@@ -1,17 +1,3 @@
-// ============================================================
-//  LabTests.jsx
-//
-//  Ei page ta patient_test table er upor kaj kore — jeta amader
-//  M:N junction table (patient <-> lab_test), ar tar PK holo
-//  (patient_id, test_id, test_date) — teen ta column mile.
-//
-//  Ei jonno result add korte tin tai lagbe, shudhu ekta id na.
-//
-//  Duita view:
-//    Pending  — jei test er result ekhono ashe nai
-//    History  — ek patient er sob test, result shoho
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth';
 import {
@@ -28,15 +14,6 @@ const prettyDate = (d) => {
   });
 };
 
-// PATCH er URL e date lage — '2026-07-04' format e.
-//
-// ⚠️ .toISOString() use kora jabe na. Postgres er DATE column
-// node-postgres e local midnight hishebe ashe, tarpor JSON e
-// UTC te convert hoy. Dhaka UTC+6, tai midnight theke 6 ghonta
-// bad giye AGE ER DIN e chole jay — 30 tarikh 29 hoye jay.
-//
-// Local component (getFullYear/getMonth/getDate) niley
-// calendar date ta thik thake.
 const isoDate = (d) => {
   const dt = new Date(d);
   const y  = dt.getFullYear();
@@ -49,7 +26,7 @@ export default function LabTests() {
   const { user } = useAuth();
   const isDoctor = user.role === 'doctor';
 
-  const [view, setView] = useState('pending');       // 'pending' | 'history'
+  const [view, setView] = useState('pending');
 
   const [pending, setPending]   = useState([]);
   const [catalog, setCatalog]   = useState([]);
@@ -64,7 +41,6 @@ export default function LabTests() {
   const [notice, setNotice]   = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  // kon row e result likha hocche + ki likha hocche
   const [editKey, setEditKey]   = useState(null);
   const [resultText, setResultText] = useState('');
 
@@ -73,7 +49,6 @@ export default function LabTests() {
 
   useEffect(() => { loadAll(); }, []);
 
-  // patient select korle tar history ane
   useEffect(() => {
     if (!historyId) { setHistory([]); return; }
     getPatientTests(historyId)
@@ -116,7 +91,6 @@ export default function LabTests() {
       setNotice('Test ordered.');
       loadAll();
     } catch (err) {
-      // 409 = eki patient, eki test, eki date already ache (composite PK)
       setError(err.response?.data?.error || 'Could not order this test.');
     }
   }
@@ -184,7 +158,6 @@ export default function LabTests() {
         </div>
       )}
 
-      {/* ---------- order form ---------- */}
       {showForm && (
         <div className="form">
           <div className="form-title">Order a lab test</div>

@@ -1,20 +1,9 @@
-// ============================================================
-//  api.js — backend er sathe kotha bolar ek matro jayga
-//  Kono component e direct axios import korbe na, ekhan theke nibe.
-// ============================================================
-
 import axios from 'axios';
 
 const api = axios.create({
   baseURL: 'http://localhost:5000/api',
 });
 
-// ============================================================
-//  ⚙️  ADJUST HERE  —  backend er auth ready hole SHUDHU EI
-//     BLOCK TA palte hobe. Onno kono file e hat dite hobe na.
-// ============================================================
-
-// 1) Endpoint er path
 const AUTH = {
   login:    '/auth/login',
   register: '/auth/register',
@@ -22,17 +11,10 @@ const AUTH = {
   me:       '/auth/me',
 };
 
-// 2) Login response theke token ar user kivabe ber korbo.
-//    Backend jodi { token, user } pathay — ei duita thik ache.
-//    Cookie use korle readToken ke () => null kore dao ar
-//    api.create e { withCredentials: true } add koro.
 const readToken = (data) => data.token;
 const readUser  = (data) => data.user;
 
-// 3) Protected request e header kivabe jabe
 const authHeader = (token) => ({ Authorization: `Bearer ${token}` });
-
-// ============================================================
 
 const TOKEN_KEY = 'healthflow_token';
 
@@ -40,14 +22,12 @@ export const getToken   = () => localStorage.getItem(TOKEN_KEY);
 export const setToken   = (t) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
-// Protita request e token ta apni-apni juḱte jay
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) Object.assign(config.headers, authHeader(token));
   return config;
 });
 
-// 401 ashle token ta purano/revoked — mucche dei
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -56,7 +36,6 @@ api.interceptors.response.use(
   }
 );
 
-// ---------- AUTH ----------
 export const apiLogin = async (email, password) => {
   const res = await api.post(AUTH.login, { email, password });
   const token = readToken(res.data);
@@ -73,7 +52,7 @@ export const apiLogout = async () => {
   try {
     await api.post(AUTH.logout);
   } finally {
-    clearToken();          // server fail korleo local token muchi
+    clearToken();
   }
 };
 
@@ -82,7 +61,6 @@ export const apiMe = async () => {
   return readUser(res.data);
 };
 
-// ---------- PATIENTS ----------
 export const getPatients   = (search = '') => api.get('/patients', { params: { search } });
 export const getPatient    = (id)          => api.get(`/patients/${id}`);
 export const createPatient = (data)        => api.post('/patients', data);
@@ -91,7 +69,6 @@ export const deletePatient = (id)          => api.delete(`/patients/${id}`);
 export const updateContact = (id, data)    => api.patch(`/patients/${id}/contact`, data);
 export const createPatientLogin = (id, data) => api.post(`/patients/${id}/login`, data);
 
-// ---------- DEPARTMENTS ----------
 export const getDepartments   = () => api.get('/departments');
 export const createDepartment = (data) => api.post('/departments', data);
 export const updateDepartment = (id, data) => api.put(`/departments/${id}`, data);
@@ -104,11 +81,9 @@ export const updateRoom    = (roomNo, data) => api.put(`/rooms/${roomNo}`, data)
 export const setRoomStatus = (roomNo, status) => api.patch(`/rooms/${roomNo}/status`, { status });
 export const deleteRoom    = (roomNo) => api.delete(`/rooms/${roomNo}`);
 
-// ---------- DOCTORS ----------
 export const getDoctors        = ()   => api.get('/doctors');
 export const getDoctor         = (id) => api.get(`/doctors/${id}`);
 export const getDoctorSchedule = (id) => api.get(`/doctors/${id}/schedule`);
-// all=true — off kora slot gulo o ashe (doctor er nijer page e lage)
 export const getFullSchedule    = (id) => api.get(`/doctors/${id}/schedule`, { params: { all: true } });
 export const addScheduleSlot    = (id, data) => api.post(`/doctors/${id}/schedule`, data);
 export const toggleScheduleSlot = (id, scheduleId, is_active) =>
@@ -119,7 +94,6 @@ export const createDoctor      = (data)     => api.post('/doctors', data);
 export const updateDoctor      = (id, data) => api.put(`/doctors/${id}`, data);
 export const deleteDoctor      = (id)       => api.delete(`/doctors/${id}`);
 
-// ---------- APPOINTMENTS ----------
 export const getAppointments  = (params = {}) => api.get('/appointments', { params });
 export const getAppointment   = (id)          => api.get(`/appointments/${id}`);
 export const bookAppointment  = (data)        => api.post('/appointments', data);
@@ -127,7 +101,6 @@ export const updateApptStatus = (id, status)  => api.patch(`/appointments/${id}/
 export const getAvailableSlots = (doctorId, date) =>
   api.get('/appointments/available-slots', { params: { doctor_id: doctorId, date } });
 
-// ---------- BILLING ----------
 export const getBills   = ()         => api.get('/billing');
 export const getBill    = (id)       => api.get(`/billing/${id}`);
 export const getDueBills = ()        => api.get('/billing/due');
@@ -138,14 +111,12 @@ export const billVisit = (apptId) => api.post(`/billing/from-appointment/${apptI
 export const sellOverCounter = (data) => api.post('/pharmacy/sell', data);
 export const getSalesLog = () => api.get('/pharmacy/sales');
 
-// ---------- ADMISSIONS ----------
 export const getAdmissions    = ()         => api.get('/admissions');
 export const getAdmission     = (id)       => api.get(`/admissions/${id}`);
 export const getAvailableRooms = ()        => api.get('/admissions/available-rooms');
 export const admitPatient     = (data)     => api.post('/admissions', data);
 export const dischargePatient = (id, data) => api.patch(`/admissions/${id}/discharge`, data);
 
-// ---------- LAB TESTS ----------
 export const getTestCatalog   = ()   => api.get('/labtests/catalog');
 export const getPendingTests  = ()   => api.get('/labtests/pending');
 export const getPatientTests  = (id) => api.get(`/labtests/patient/${id}`);
@@ -153,7 +124,6 @@ export const assignTest       = (data) => api.post('/labtests', data);
 export const addTestResult    = (patientId, testId, testDate, result) =>
   api.patch(`/labtests/${patientId}/${testId}/${testDate}`, { result });
 
-// ---------- MEDICINES ----------
 export const getMedicines   = (search = '') => api.get('/medicines', { params: { search } });
 export const getLowStock    = () => api.get('/medicines/low-stock');
 export const createMedicine = (data) => api.post('/medicines', data);
@@ -161,7 +131,6 @@ export const updateMedicine = (id, data) => api.put(`/medicines/${id}`, data);
 export const adjustStock    = (id, quantity) => api.patch(`/medicines/${id}/stock`, { quantity });
 export const deleteMedicine = (id) => api.delete(`/medicines/${id}`);
 
-// ---------- PRESCRIPTIONS ----------
 export const getPrescription        = (id) => api.get(`/prescriptions/${id}`);
 export const getPatientPrescriptions = (id) => api.get(`/prescriptions/patient/${id}`);
 export const createPrescription     = (data) => api.post('/prescriptions', data);

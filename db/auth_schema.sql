@@ -1,10 +1,8 @@
 
--- Demo password for seeded accounts: Pass@123
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 DROP TABLE IF EXISTS auth_sessions CASCADE;
 DROP TABLE IF EXISTS app_user CASCADE;
--- Login credentials and role ownership links.
 CREATE TABLE app_user (
     user_id       SERIAL PRIMARY KEY,
 
@@ -23,7 +21,6 @@ CREATE TABLE app_user (
     is_active     BOOLEAN NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    -- Patient and doctor accounts must link to exactly one owner record.
     CONSTRAINT chk_role_link CHECK (
         (role = 'patient'      AND patient_id IS NOT NULL AND doctor_id IS NULL) OR
         (role = 'doctor'       AND doctor_id  IS NOT NULL AND patient_id IS NULL) OR
@@ -36,7 +33,6 @@ CREATE TABLE app_user (
 
 CREATE INDEX idx_user_email ON app_user(email);
 CREATE INDEX idx_user_role  ON app_user(role);
--- Stored sessions allow logout to invalidate the token server-side.
 CREATE TABLE auth_sessions (
     session_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     INT NOT NULL
@@ -46,7 +42,6 @@ CREATE TABLE auth_sessions (
 );
 
 CREATE INDEX idx_session_user ON auth_sessions(user_id);
--- Seed accounts for local development.
 INSERT INTO app_user (email, password_hash, full_name, role, patient_id, doctor_id) VALUES
 
 ('admin@healthflow.com',
