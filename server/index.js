@@ -1,6 +1,6 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+const express = require('express');// backend/api server
+const cors = require('cors');//api access from frontend
+require('dotenv').config();//.env theke db,jwt configuration
 
 const app = express();
 const PORT = process.env.PORT || 5000;

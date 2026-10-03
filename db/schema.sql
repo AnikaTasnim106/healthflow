@@ -89,7 +89,6 @@ CREATE TABLE doctor_schedule (
     is_active      BOOLEAN NOT NULL DEFAULT TRUE,
 
     CONSTRAINT chk_sched_time  CHECK (end_time > start_time),
-    -- same doctor cannot have two schedules starting at the same time on a day
     CONSTRAINT uq_doc_day_slot UNIQUE (doctor_id, day_of_week, start_time)
 );
 
